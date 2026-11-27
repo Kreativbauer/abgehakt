@@ -46,8 +46,13 @@ export async function testGate(request, env, url) {
 }
 
 async function login(request, env, url) {
+  // Nur von dieser Seite. Formulare schicken wegen „Referrer-Policy: no-referrer“ als Origin „null“ – daher zählt
+  // vor allem Sec-Fetch-Site (setzen alle aktuellen Browser, lässt sich von Seiten nicht fälschen).
+  const site = request.headers.get("Sec-Fetch-Site");
   const origin = request.headers.get("Origin");
-  if (origin && origin !== url.origin) return new Response("Nicht erlaubt.", { status: 403 });
+  if ((site && site !== "same-origin" && site !== "none") || (origin && origin !== "null" && origin !== url.origin)) {
+    return new Response("Nicht erlaubt.", { status: 403 });
+  }
   try {
     await rateLimit(env.CODE_LIMITER, request, "test-login");
   } catch {
