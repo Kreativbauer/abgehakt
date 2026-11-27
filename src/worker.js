@@ -12,6 +12,7 @@ import { operatorDeleteClass, operatorListReports, operatorRemoveMember, operato
 import { listReports, reportTask, resolveReport } from "./api/reports.js";
 import { operatorListFeedback, operatorResolveFeedback, sendFeedback } from "./api/feedback.js";
 import { archiveSubject, chooseSubjects, createSubject, listSubjects, setTimetable, updateSubject } from "./api/subjects.js";
+import { gateActive, testGate } from "./lib/testgate.js";
 import { runDailyCleanup } from "./jobs/cleanup.js";
 import { runNotifications } from "./jobs/notify.js";
 import { deleteSubscription, pushKey, saveSubscription, subscriptionStatus, testPush } from "./api/push.js";
@@ -118,8 +119,13 @@ export default {
 
   async fetch(request, env) {
     const url = new URL(request.url);
+    // Nur Testversion: Passwort-Schutz vor allem anderen (dort läuft der Worker für jede Anfrage zuerst).
+    if (gateActive(env, url)) {
+      const locked = await testGate(request, env, url);
+      if (locked) return locked;
+    }
     if (!url.pathname.startsWith("/api/")) {
-      // Sollte wegen run_worker_first nicht vorkommen: statische Datei ausliefern.
+      // Echte Seite: kommt wegen run_worker_first nicht vor. Testversion: freigegebene statische Datei ausliefern.
       return env.ASSETS.fetch(request);
     }
 

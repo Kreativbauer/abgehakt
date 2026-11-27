@@ -94,6 +94,22 @@ jobs:
       # Eigene Benachrichtigungs-Schlüssel (VAPID) nur für die Testversion – einmalig, wenn sie noch fehlen.
       # Werden hier erzeugt und direkt als Secret beim Worker abgehakt-test gespeichert; niemand sieht sie.
       # Die Schlüssel des echten Workers bleiben unberührt (dort nie neu erzeugen!).
+      # Passwort der Testversion (GitHub-Secret TEST_PASSWORD) beim Worker abgehakt-test hinterlegen.
+      # Fehlt es, bleibt die Testversion gesperrt (src/lib/testgate.js).
+      - name: Passwort der Testversion setzen
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$TEST_PASSWORD" ]; then
+            echo "::warning::GitHub-Secret TEST_PASSWORD fehlt – die Testversion bleibt gesperrt."; exit 0
+          fi
+          umask 077
+          node -e 'process.stdout.write(JSON.stringify({ TEST_PASSWORD: process.env.TEST_PASSWORD }))' > test-pass.json
+          npx wrangler secret bulk test-pass.json --env test
+          rm -f test-pass.json
       - name: Benachrichtigungs-Schlüssel der Testversion (nur beim ersten Mal)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

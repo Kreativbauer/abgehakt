@@ -381,6 +381,12 @@ Die öffentliche Adresse steht an diesen Stellen – bei eigener Domain alle zus
   sieht sie); `RESEND_API_KEY` braucht die Testversion nicht: Mit `TEST_SHOW_CODES=1` (nur in `env.test`, plus Prüfung des Hostnamens
   `abgehakt-test.`) gibt `startLogin` den Anmeldecode direkt an die App zurück (`testCode`), keine E-Mail. Eigenen
   `OPERATOR_KEY` setzt Nils bei Bedarf beim Worker `abgehakt-test`. Lokal: `npx wrangler deploy --env test --dry-run`.
+  **Passwort-Schutz** (`src/lib/testgate.js`): In `env.test` läuft der Worker für jede Anfrage zuerst (`run_worker_first: true`),
+  `TEST_GATE=1` + Hostname `abgehakt-test.` aktivieren ihn. Ohne Cookie zeigt jede Seite ein Passwort-Formular
+  (`POST /__test-login`, Rate-Limit), die API antwortet 401 `test_locked`; frei sind nur Manifest, Symbole und CSS. Passwort =
+  GitHub-Secret `TEST_PASSWORD`, `deploy-test` überträgt es als Worker-Secret (fehlt es → gesperrt). Cookie = HMAC des Passworts,
+  1 Jahr; neues Passwort meldet alle ab. Lokal testen: `npx wrangler dev --env test --var TEST_PASSWORD:…` und Header
+  `Host: abgehakt-test.nilskaplan8.workers.dev`.
 
 ## Arbeitsweise
 

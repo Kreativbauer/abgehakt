@@ -64,6 +64,13 @@
   "env": {
     "test": {
       "name": "abgehakt-test",
+      // Passwort-Schutz (src/lib/testgate.js): Der Worker muss dafür jede Anfrage zuerst sehen, nicht nur /api/*.
+      "assets": {
+        "directory": "./public",
+        "binding": "ASSETS",
+        "not_found_handling": "404-page",
+        "run_worker_first": true
+      },
       "d1_databases": [
         {
           "binding": "DB",
@@ -84,7 +91,9 @@
         "APP_URL": "https://abgehakt-test.nilskaplan8.workers.dev/app/",
         "VAPID_SUBJECT": "mailto:info@skyhome42.de",
         // Nur hier: Anmeldecodes ohne E-Mail direkt in der App anzeigen (src/api/account.js). Nie beim echten Worker!
-        "TEST_SHOW_CODES": "1"
+        "TEST_SHOW_CODES": "1",
+        // Nur hier: Passwort-Schutz der Testversion (Secret TEST_PASSWORD, kommt aus dem GitHub-Secret über deploy.yml).
+        "TEST_GATE": "1"
       },
       "triggers": {
         "crons": ["23 2 * * *", "*/5 * * * *"]
