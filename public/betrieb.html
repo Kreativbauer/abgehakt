@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Betrieb – Abgehakt</title>
+  <meta name="theme-color" content="#08090a" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <!-- Eigenes Symbol (orange mit Schild), damit man es auf dem Home-Bildschirm von der App unterscheidet -->
+  <link rel="icon" href="/betrieb.svg" type="image/svg+xml">
+  <link rel="manifest" href="/betrieb.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/betrieb-apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Betrieb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link rel="stylesheet" href="/css/style.css?v=0.36.2">
+  <script src="/js/betrieb.js?v=0.36.2" defer></script>
+</head>
+<body class="app">
+  <header class="topbar">
+    <span class="brand">Abgehakt · Betrieb</span>
+  </header>
+  <main class="content">
+    <h1>Betrieb</h1>
+    <p class="muted">Hier siehst du nur gemeldete Einträge – nie ganze Klassen.</p>
+
+    <div class="card">
+      <div id="key-entry">
+        <label for="input-key">Betreiber-Schlüssel</label>
+        <input id="input-key" class="input" type="password" autocomplete="off" required>
+        <p class="hint">Das Secret <code>OPERATOR_KEY</code> bei Cloudflare.</p>
+        <div id="remember-box" class="invite-actions" hidden>
+          <button id="button-remember-faceid" class="button button-primary button-small" type="button">Angemeldet bleiben (Face ID)</button>
+          <button id="button-remember-plain" class="button button-small" type="button">Ohne Face ID merken</button>
+        </div>
+      </div>
+      <div id="key-locked" hidden>
+        <p class="hint">Der Schlüssel ist auf diesem Gerät gespeichert und mit Face ID / Fingerabdruck gesichert.</p>
+        <button id="button-unlock" class="button button-primary" type="button">Entsperren</button>
+      </div>
+      <div id="key-ready" hidden>
+        <p id="key-ready-text" class="hint"></p>
+        <button id="button-forget" class="link-button" type="button">Auf diesem Gerät abmelden</button>
+      </div>
+      <p id="error-key" class="error" role="alert" hidden></p>
+    </div>
+
+    <div class="card settings-card">
+      <h2 class="section-title">Benachrichtigungen</h2>
+      <p id="op-push-status" class="hint">Benachrichtigungen bei neuen Ideen und Fehlern und bei Meldungen, die Admins für in Ordnung halten. Keine Inhalte aus Heften.</p>
+      <div id="op-push-options" hidden>
+        <label class="toggle"><input id="op-push-feedback" type="checkbox"><span>Ideen und Fehler</span></label>
+        <label class="toggle"><input id="op-push-reports" type="checkbox"><span>Meldungen, die Admins für in Ordnung halten</span></label>
+        <label class="toggle"><input id="op-push-classes" type="checkbox"><span>Neue Klasse angelegt</span></label>
+        <p id="op-push-saved" class="hint" role="status"></p>
+      </div>
+      <p id="error-op-push" class="error" role="alert" hidden></p>
+      <div class="invite-actions">
+        <button id="button-op-push-on" class="button button-primary button-small" type="button" hidden>Einschalten</button>
+        <button id="button-op-push-test" class="button button-small" type="button" hidden>Test schicken</button>
+        <button id="button-op-push-off" class="button button-small" type="button" hidden>Ausschalten</button>
+      </div>
+    </div>
+
+    <section class="task-section">
+      <h2 class="section-title">Meldungen</h2>
+      <p class="hint">Meldungen, auf die die Admins der Klasse noch nicht reagiert haben, und Einträge, die die Admins für in Ordnung halten. „Ist in Ordnung“ schließt die Meldung, der Eintrag bleibt stehen.</p>
+      <button id="button-load-reports" class="button button-primary" type="button">Meldungen laden</button>
+      <p id="error-reports" class="error" role="alert" hidden></p>
+      <p id="result-reports" class="notice" role="status" hidden></p>
+      <ul id="op-report-list" class="invite-list"></ul>
+      <p id="op-reports-empty" class="empty" hidden>Keine Meldungen zu prüfen.</p>
+    </section>
+
+    <section class="task-section">
+      <h2 class="section-title">Ideen und Fehler</h2>
+      <p class="hint">Anonyme Nachrichten aus der App. Erledigtes wird nach 6 Monaten gelöscht.</p>
+      <button id="button-load-feedback" class="button button-primary" type="button">Feedback laden</button>
+      <p id="error-feedback" class="error" role="alert" hidden></p>
+      <ul id="op-feedback-list" class="invite-list"></ul>
+      <p id="op-feedback-empty" class="empty" hidden>Keine neuen Nachrichten.</p>
+    </section>
+
+    <section class="task-section">
+      <h2 class="section-title">Person entfernen (Wunsch der Eltern oder der Person)</h2>
+      <form id="form-remove-member" class="card" novalidate>
+        <p class="hint">Wie „Klasse verlassen“: Zugang weg, Häkchen, Notizen, private Aufgaben und Wahlfächer gelöscht, Name → „Ehemaliges Mitglied“, ein nicht mehr gebrauchtes Admin-Konto gleich mit. Du siehst dabei keine Inhalte. Die Kennung steht in der App unter Einstellungen → Klasse.</p>
+        <label for="input-remove-class">Kennung der Klasse</label>
+        <input id="input-remove-class" class="input" autocomplete="off" spellcheck="false" placeholder="z. B. 426f45ce-…" required>
+        <label for="input-remove-name">Name in der Klasse</label>
+        <input id="input-remove-name" class="input" autocomplete="off" spellcheck="false" required>
+        <label class="toggle">
+          <input id="input-remove-confirm" type="checkbox">
+          <span>Ich will diese Person aus der Klasse entfernen.</span>
+        </label>
+        <p id="error-remove-member" class="error" role="alert" hidden></p>
+        <p id="result-remove-member" class="notice" role="status" hidden></p>
+        <button class="button button-danger" type="submit">Person entfernen</button>
+      </form>
+    </section>
+
+    <section class="task-section">
+      <h2 class="section-title">Klasse direkt löschen (Notbremse)</h2>
+      <form id="form-operator" class="card" novalidate>
+        <p class="hint">Nur für eindeutige Fälle. Die Klasse wird vollständig gelöscht, ohne dass Inhalte angezeigt werden. Das lässt sich nicht rückgängig machen.</p>
+        <label for="input-target">Kennung der Klasse oder einer ihrer Codes</label>
+        <input id="input-target" class="input" autocomplete="off" spellcheck="false" placeholder="z. B. 426f45ce-… oder K7MP-4XQ2" required>
+        <label class="toggle">
+          <input id="input-confirm" type="checkbox">
+          <span>Ich will diese Klasse endgültig löschen.</span>
+        </label>
+        <p id="error-operator" class="error" role="alert" hidden></p>
+        <p id="result-operator" class="notice" role="status" hidden></p>
+        <button class="button button-danger" type="submit">Endgültig löschen</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

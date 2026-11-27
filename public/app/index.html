@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#08090a" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Abgehakt</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Abgehakt">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link rel="stylesheet" href="/css/style.css?v=0.36.2">
+  <script src="/js/changelog.js?v=0.36.2" defer></script>
+  <script src="/js/app.js?v=0.36.2" defer></script>
+</head>
+<body class="app">
+  <p id="test-banner" class="test-banner" hidden>Testversion – eigene Test-Daten, nicht dein echtes Heft</p>
+  <header class="topbar">
+    <div class="topbar-left">
+    <button id="button-nav-back" class="icon-button icon-button-small nav-back" type="button" aria-label="Zurück" title="Zurück" hidden>
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <a id="brand" class="brand" href="/" title="Zum Hausaufgabenheft">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Abgehakt
+    </a>
+    </div>
+    <div class="topbar-right">
+      <label class="switcher" id="switcher-wrap" hidden>
+        <span class="visually-hidden">Klasse wechseln</span>
+        <select id="switcher"></select>
+      </label>
+      <button id="button-refresh" class="icon-button icon-button-small" type="button" aria-label="Aktualisieren" title="Aktualisieren" hidden>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Nach unten ziehen zum Aktualisieren -->
+  <div id="pull-indicator" class="pull-indicator" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+  <main class="content">
+    <p id="loading" class="muted">Lädt …</p>
+
+    <!-- Beitreten, Schritt 1: Code -->
+    <section id="view-code" class="card" hidden>
+      <h1>Klasse beitreten</h1>
+      <p class="muted">Gib den Code ein, den du von deiner Klasse bekommen hast.</p>
+      <p id="standalone-hint" class="callout" hidden>Gerade auf den Home-Bildschirm gelegt? Dann gib hier den Code ein, den dir Abgehakt vor dem Installieren angezeigt hat – du bist dann wieder dieselbe Person. Keinen Code? Im Browser unter „Einstellungen → Weiteres Gerät anmelden“ einen erzeugen.</p>
+      <form id="form-code" novalidate>
+        <label for="input-code">Code</label>
+        <input id="input-code" class="input input-code" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" maxlength="9" placeholder="XXXX-XXXX" required>
+        <p id="error-code" class="error" role="alert" hidden></p>
+        <div class="actions">
+          <button id="button-code-back" class="button" type="button" hidden>Abbrechen</button>
+          <button class="button button-primary" type="submit">Weiter</button>
+        </div>
+      </form>
+      <p class="card-footer muted">Du willst ein Heft für deine Klasse anlegen?
+        <button id="button-to-login" class="link-button" type="button">Klasse anlegen</button><br>
+        Du bist schon Admin?
+        <button id="button-admin-login" class="link-button" type="button">Mit E-Mail anmelden</button></p>
+    </section>
+
+    <!-- Beitreten, Schritt 2: Name -->
+    <section id="view-name" class="card" hidden>
+      <p class="eyebrow">Klasse</p>
+      <h1 id="join-class-name"></h1>
+      <form id="form-name" novalidate>
+        <div id="name-field">
+          <label for="input-name">Dein Name</label>
+          <input id="input-name" class="input" name="name" autocomplete="nickname" maxlength="40" placeholder="z. B. Lena oder Lena M." required>
+          <p class="hint">So sehen dich die anderen. Ein Spitzname ist auch in Ordnung.</p>
+        </div>
+        <p id="personal-hint" class="muted" hidden></p>
+        <label class="toggle age-check">
+          <input id="input-age" type="checkbox" required>
+          <span>Ich bin mindestens 16 Jahre alt oder meine Eltern sind einverstanden.</span>
+          <span class="hint">Mehr dazu in der <a href="/datenschutz" target="_blank" rel="noopener">Datenschutzerklärung</a>.</span>
+        </label>
+        <p id="error-name" class="error" role="alert" hidden></p>
+        <div class="actions">
+          <button id="button-back" class="button" type="button">Zurück</button>
+          <button class="button button-primary" type="submit">Beitreten</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Angemeldet: Tagesansicht -->
+    <section id="view-class" hidden>
+      <div class="class-head">
+        <div>
+          <p class="eyebrow" id="class-role"></p>
+          <h1 id="class-name"></h1>
+        </div>
+        <div class="head-actions">
+          <button id="button-members" class="button button-small" type="button">Mitglieder</button>
+          <button id="button-settings" class="icon-button icon-button-small" type="button" aria-label="Einstellungen" title="Einstellungen">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="whats-new" class="callout whats-new" hidden>
+        <div>
+          <p id="whats-new-title" class="whats-new-title"></p>
+          <ul id="whats-new-list" class="whats-new-list"></ul>
+        </div>
+        <div class="whats-new-actions">
+          <button id="button-whats-new-ok" class="button button-primary button-small" type="button">Verstanden</button>
+          <button id="button-whats-new-all" class="link-button" type="button">Alle Neuerungen</button>
+        </div>
+      </div>
+
+      <div id="reports-hint" class="callout reports-hint" hidden>
+        <p id="reports-hint-text"></p>
+        <button id="button-open-reports" class="button button-primary button-small" type="button">Jetzt prüfen</button>
+      </div>
+
+      <div id="electives-hint" class="callout" hidden>
+        <p>Eure Klasse hat Wahlfächer. Wähle deine aus – dann siehst du nur Hausaufgaben aus Fächern, die du auch hast.</p>
+        <button id="button-choose-electives" class="button button-primary button-small" type="button">Wahlfächer wählen</button>
+      </div>
+
+      <div id="push-hint" class="callout" hidden>
+        <p>Soll Abgehakt dich am Vorabend an offene Hausaufgaben und an anstehende Termine erinnern?</p>
+        <div class="invite-actions">
+          <button id="button-push-hint-on" class="button button-primary button-small" type="button">Erinnerungen einschalten</button>
+          <button id="button-push-hint-no" class="button button-small" type="button">Nein danke</button>
+        </div>
+      </div>
+
+      <div id="install-hint" class="callout install-hint" hidden>
+        <p id="install-text"></p>
+        <div class="invite-actions">
+          <button id="button-install" class="button button-primary button-small" type="button" hidden>Installieren</button>
+          <button id="button-install-guide" class="button button-primary button-small" type="button" hidden>Anleitung</button>
+          <button id="button-install-later" class="button button-small" type="button">Später</button>
+        </div>
+      </div>
+
+      <p id="subject-filter" class="subject-filter" hidden>
+        <span id="subject-filter-text"></span>
+        <button id="button-toggle-all-subjects" class="link-button" type="button"></button>
+      </p>
+
+      <nav class="daynav" aria-label="Tag wählen">
+        <button id="day-prev" class="icon-button" type="button" aria-label="Vorheriger Schultag">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button id="day-label" class="day-label" type="button" title="Zurück zu heute">
+          <span id="day-relative" class="day-relative"></span>
+          <span id="day-date" class="day-date"></span>
+        </button>
+        <button id="day-next" class="icon-button" type="button" aria-label="Nächster Schultag">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </nav>
+
+      <div id="kind-filter" class="segmented" role="group" aria-label="Anzeigen" hidden>
+        <button type="button" data-filter="all">Alles</button>
+        <button type="button" data-filter="homework">Hausaufgaben</button>
+        <button type="button" data-filter="events">Termine</button>
+      </div>
+
+      <section id="events-section" class="task-section events-section" hidden>
+        <h2 id="events-title" class="section-title">Termine</h2>
+        <ul id="events-list" class="task-list"></ul>
+        <button id="button-more-events" class="link-button more-events" type="button" hidden></button>
+      </section>
+
+      <div id="day-groups"></div>
+      <p id="empty-day" class="empty" hidden>Keine offenen Hausaufgaben.</p>
+
+      <p id="sync-info" class="sync-info" hidden></p>
+
+      <button id="button-add" class="button button-primary button-add" type="button">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        Aufgabe eintragen
+      </button>
+
+      <p class="account muted">
+        Angemeldet als <strong id="member-name"></strong> ·
+        <button id="button-feedback-footer" class="link-button" type="button">Idee oder Fehler?</button> ·
+        <button id="button-join-more" class="link-button" type="button">Einer weiteren Klasse beitreten</button> ·
+        <button id="button-new-class" class="link-button" type="button">Neue Klasse anlegen</button>
+      </p>
+    </section>
+
+    <!-- Aufgabe eintragen / bearbeiten -->
+    <section id="view-task-form" class="card" hidden>
+      <h1 id="task-form-title">Aufgabe eintragen</h1>
+      <form id="form-task" novalidate>
+        <label for="input-kind">Art</label>
+        <select id="input-kind" class="input">
+          <option value="homework">Hausaufgabe</option>
+          <option value="exam">Schulaufgabe</option>
+          <option value="short_exam">Kurzarbeit</option>
+          <option value="test">Test / Abfrage</option>
+          <option value="presentation">Referat / Abgabe</option>
+          <option value="other">Sonstiger Termin</option>
+        </select>
+
+        <label for="input-subject-select">Fach</label>
+        <select id="input-subject-select" class="input"></select>
+        <p id="subject-scope-hint" class="hint" hidden>Für die Klasse trägst du nur in deinen Fächern ein. Für dich selbst: „Nur für mich“ unten.</p>
+        <div id="new-subject-fields" class="new-subject" hidden>
+          <label for="input-new-subject">Neues Fach</label>
+          <input id="input-new-subject" class="input" maxlength="40" autocomplete="off" placeholder="z. B. Spanisch">
+          <label class="toggle">
+            <input id="input-new-subject-elective" type="checkbox">
+            <span>Wahlfach</span>
+            <span class="hint">Nicht alle in der Klasse haben dieses Fach.</span>
+          </label>
+        </div>
+
+        <div id="title-fields">
+          <label for="input-title" id="label-title">Was ist zu tun?</label>
+          <input id="input-title" class="input" maxlength="200" autocomplete="off" placeholder="z. B. S. 42 Nr. 3 und 4" required>
+          <p id="paste-hint" class="hint" role="status" hidden></p>
+        </div>
+
+        <label for="input-details"><span id="label-details">Details</span> <span class="optional">(optional)</span></label>
+        <textarea id="input-details" class="input textarea" maxlength="2000" rows="3"></textarea>
+
+        <label id="label-due" for="input-due">Abgabe am</label>
+        <input id="input-due" class="input" type="date" required>
+        <p id="due-hint" class="hint" hidden></p>
+
+        <div id="repeat-fields">
+          <label for="input-repeat">Wiederholen</label>
+          <select id="input-repeat" class="input">
+            <option value="0">Nicht wiederholen</option>
+            <option value="1">Jede Woche</option>
+            <option value="2">Alle 2 Wochen</option>
+            <option value="lessons">Jede Stunde (laut Stundenplan)</option>
+          </select>
+          <div id="repeat-until-fields" hidden>
+            <label for="input-repeat-until">Bis</label>
+            <input id="input-repeat-until" class="input" type="date">
+            <p id="repeat-hint" class="hint" role="status"></p>
+          </div>
+        </div>
+
+        <label id="private-row" class="toggle">
+          <input id="input-private" type="checkbox">
+          <span>Nur für mich</span>
+          <span class="hint">Private Aufgaben sieht niemand sonst – auch keine Admins.</span>
+        </label>
+        <p id="private-hint" class="hint" hidden>Diese Aufgabe siehst nur du. Aufgaben für die ganze Klasse tragen Admins und Eintragende ein.</p>
+
+        <div id="dup-hint" class="callout dup-hint" role="status" hidden>
+          <p class="callout-title">Gibt es schon?</p>
+          <ul id="dup-list" class="dup-list"></ul>
+          <p class="hint">Steht es schon drin, tippe auf „Abbrechen“. Sonst noch einmal auf „Trotzdem speichern“.</p>
+        </div>
+        <p id="error-task" class="error" role="alert" hidden></p>
+        <div class="actions">
+          <button id="button-task-cancel" class="button" type="button">Abbrechen</button>
+          <button id="button-task-save" class="button button-primary" type="submit">Speichern</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Admin-Anmeldung, Schritt 1: E-Mail -->
+    <section id="view-login" class="card" hidden>
+      <h1>Als Admin anmelden</h1>
+      <p id="login-intro" class="muted">Um eine Klasse anzulegen, brauchst du als Admin eine E-Mail-Adresse. Wir schicken dir einen Code – kein Passwort nötig. Mitglieder brauchen keine E-Mail.</p>
+      <form id="form-login" novalidate>
+        <label for="input-email">E-Mail-Adresse</label>
+        <input id="input-email" class="input" type="email" autocomplete="email" inputmode="email" maxlength="254" required>
+        <p id="error-login" class="error" role="alert" hidden></p>
+        <div class="actions">
+          <button id="button-login-back" class="button" type="button">Zurück</button>
+          <button class="button button-primary" type="submit">Code schicken</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Admin-Anmeldung, Schritt 2: Code aus der E-Mail -->
+    <section id="view-login-code" class="card" hidden>
+      <h1>Code eingeben</h1>
+      <p class="muted">Wir haben einen 6-stelligen Code an <strong id="login-email"></strong> geschickt. Schau auch im Spam-Ordner nach.</p>
+      <p id="login-test-code" class="callout" hidden>Testversion: Es wird keine E-Mail verschickt – der Code ist schon eingetragen.</p>
+      <form id="form-login-code" novalidate>
+        <label for="input-login-code">Code</label>
+        <input id="input-login-code" class="input input-code" autocomplete="one-time-code" inputmode="numeric" maxlength="7" placeholder="123 456" required>
+        <p id="error-login-code" class="error" role="alert" hidden></p>
+        <div class="actions">
+          <button id="button-login-other" class="button" type="button">Andere E-Mail</button>
+          <button class="button button-primary" type="submit">Anmelden</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Klasse anlegen -->
+    <section id="view-create-class" class="card" hidden>
+      <h1>Klasse anlegen</h1>
+      <p class="muted">Angemeldet als <span id="account-email"></span>.</p>
+      <form id="form-create-class" novalidate>
+        <label for="input-class-name">Name der Klasse</label>
+        <input id="input-class-name" class="input" maxlength="60" autocomplete="off" placeholder="z. B. 8b Gymnasium X" required>
+        <label for="input-admin-name">Dein Name in der Klasse</label>
+        <input id="input-admin-name" class="input" maxlength="40" autocomplete="nickname" placeholder="z. B. Nils" required>
+        <p class="hint">So sehen dich die anderen. Deine E-Mail-Adresse sieht niemand.</p>
+        <label class="toggle age-check">
+          <input id="input-age-admin" type="checkbox" required>
+          <span>Ich bin mindestens 16 Jahre alt oder meine Eltern sind einverstanden.</span>
+          <span class="hint">Mehr dazu in der <a href="/datenschutz" target="_blank" rel="noopener">Datenschutzerklärung</a>.</span>
+        </label>
+        <p id="error-create-class" class="error" role="alert" hidden></p>
+        <div class="actions">
+          <button id="button-create-cancel" class="button" type="button">Abbrechen</button>
+          <button class="button button-primary" type="submit">Anlegen</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Einladen (nur Admins) -->
+    <section id="view-invites" hidden>
+      <p class="eyebrow" id="invites-class-name"></p>
+      <h1>Mitglieder einladen</h1>
+      <p class="muted">Teile einen Code oder Link in eurer Klassengruppe. Wer ihn hat, kann mit Namen beitreten.</p>
+      <ul id="invite-list" class="invite-list"></ul>
+      <p id="invites-empty" class="empty" hidden>Kein gültiger Einladungscode. Erzeuge einen neuen.</p>
+      <p id="error-invites" class="error" role="alert" hidden></p>
+
+      <form id="form-invite" class="card" novalidate>
+        <h2 class="section-title">Neuer Einladungscode</h2>
+        <label for="input-invite-days">Gültig für</label>
+        <select id="input-invite-days" class="input">
+          <option value="1">1 Tag</option>
+          <option value="3">3 Tage</option>
+          <option value="7" selected>7 Tage</option>
+          <option value="14">14 Tage</option>
+          <option value="30">30 Tage</option>
+        </select>
+        <label for="input-invite-max">Höchstens so viele Beitritte <span class="optional">(optional)</span></label>
+        <input id="input-invite-max" class="input" type="number" inputmode="numeric" min="1" max="500" placeholder="unbegrenzt">
+        <button class="button button-primary" type="submit">Code erzeugen</button>
+      </form>
+
+      <p><button id="button-invites-back" class="button" type="button">Zurück</button></p>
+    </section>
+
+    <!-- Mitglieder -->
+    <section id="view-members" hidden>
+      <p class="eyebrow" id="members-class-name"></p>
+      <h1>Mitglieder</h1>
+      <p id="members-count" class="muted"></p>
+
+      <div id="secure-hint" class="callout" hidden>
+        <p>Sichere deine Admin-Rechte mit deiner E-Mail ab. Dann kommst du auch nach einem Gerätewechsel wieder an die Klasse.</p>
+        <button id="button-secure" class="button button-small" type="button">Mit E-Mail absichern</button>
+      </div>
+
+      <div id="admin-tools" class="admin-tools" hidden>
+        <button id="button-invites" class="button button-primary" type="button">Einladungscodes</button>
+        <button id="button-add-member" class="button" type="button">Person hinzufügen</button>
+        <button id="button-reports-menu" class="button" type="button">Meldungen <span id="reports-count" class="count-badge" hidden></span></button>
+      </div>
+
+      <form id="form-add-member" class="card" hidden novalidate>
+        <h2 class="section-title">Person hinzufügen</h2>
+        <p class="hint">Für Nachzügler: Du legst den Namen fest und bekommst einen persönlichen Code, den nur diese Person benutzen kann.</p>
+        <label for="input-member-name">Name</label>
+        <input id="input-member-name" class="input" maxlength="40" autocomplete="off" required>
+        <p id="error-add-member" class="error" role="alert" hidden></p>
+        <div class="actions">
+          <button id="button-add-member-cancel" class="button" type="button">Abbrechen</button>
+          <button class="button button-primary" type="submit">Hinzufügen</button>
+        </div>
+      </form>
+
+      <div id="personal-code-box"></div>
+      <p id="error-members" class="error" role="alert" hidden></p>
+      <ul id="member-list" class="member-list"></ul>
+
+      <p><button id="button-members-back" class="button" type="button">Zurück zum Heft</button></p>
+    </section>
+
+    <!-- Meine Einstellungen (nur für diese Person) -->
+    <section id="view-settings" hidden>
+      <p class="eyebrow" id="settings-class-name"></p>
+      <h1>Einstellungen</h1>
+      <div class="segmented settings-tabs" role="tablist" aria-label="Einstellungen">
+        <button type="button" role="tab" data-tab="me">Für mich</button>
+        <button type="button" role="tab" data-tab="class">Klasse</button>
+      </div>
+      <p class="muted">Gilt nur für dich.</p>
+
+      <form id="form-rename" class="card" novalidate>
+        <h2 class="section-title">Dein Name</h2>
+        <label for="input-rename" class="visually-hidden">Dein Name</label>
+        <input id="input-rename" class="input" maxlength="40" autocomplete="nickname" required>
+        <p class="hint">So sehen dich die anderen in der Klasse.</p>
+        <p id="rename-saved" class="hint" role="status"></p>
+        <p id="error-rename" class="error" role="alert" hidden></p>
+        <button class="button button-primary" type="submit">Namen speichern</button>
+      </form>
+
+      <div class="card settings-card">
+        <h2 class="section-title">Meine Wahlfächer</h2>
+        <p id="settings-electives-text" class="hint"></p>
+        <button id="button-my-electives" class="button button-small" type="button">Wahlfächer ändern</button>
+      </div>
+
+      <form id="form-visibility" class="card settings-card" novalidate>
+        <h2 class="section-title">Wer sieht, was du erledigt hast?</h2>
+        <label class="radio"><input type="radio" name="visibility" value="none"> <span>Niemand</span></label>
+        <label class="radio"><input type="radio" name="visibility" value="all"> <span>Alle in der Klasse</span></label>
+        <label class="radio"><input type="radio" name="visibility" value="some"> <span>Bestimmte Personen</span></label>
+        <fieldset id="viewer-list" class="viewer-list" hidden>
+          <legend class="visually-hidden">Personen auswählen</legend>
+        </fieldset>
+        <p class="hint">Deine privaten Aufgaben und Notizen sieht nie jemand außer dir.</p>
+        <p id="settings-saved" class="hint" role="status"></p>
+        <p id="error-settings" class="error" role="alert" hidden></p>
+        <button class="button button-primary" type="submit">Speichern</button>
+      </form>
+
+      <div id="push-card" class="card settings-card">
+        <h2 class="section-title">Benachrichtigungen</h2>
+        <p id="push-status" class="hint"></p>
+        <div id="push-options" hidden>
+          <label class="toggle">
+            <input id="push-reminder" type="checkbox">
+            <span>Erinnerung am Vorabend</span>
+            <span class="hint">Was für morgen noch offen ist – nur wenn wirklich etwas offen ist.</span>
+          </label>
+          <label class="toggle">
+            <input id="push-events" type="checkbox">
+            <span>Termine</span>
+            <span class="hint">Am Vorabend und 3 Tage vorher, z. B. vor Schulaufgaben.</span>
+          </label>
+          <label for="push-hour">Uhrzeit für Erinnerungen</label>
+          <select id="push-hour" class="input input-small"><option value="15">15 Uhr</option><option value="16">16 Uhr</option><option value="17">17 Uhr</option><option value="18">18 Uhr</option><option value="19">19 Uhr</option><option value="20">20 Uhr</option><option value="21">21 Uhr</option></select>
+          <label class="toggle">
+            <input id="push-new" type="checkbox">
+            <span>Neue Einträge</span>
+            <span class="hint">Wenn jemand etwas für die Klasse einträgt (nur Fächer, die du hast).</span>
+          </label>
+          <label id="push-reports-row" class="toggle" hidden>
+            <input id="push-reports" type="checkbox">
+            <span>Meldungen (für Admins)</span>
+            <span class="hint">Wenn jemand einen Eintrag meldet – damit du ihn schnell prüfen kannst.</span>
+          </label>
+          <p id="push-saved" class="hint" role="status"></p>
+        </div>
+        <p id="error-push" class="error" role="alert" hidden></p>
+        <div class="invite-actions">
+          <button id="button-push-on" class="button button-primary button-small" type="button" hidden>Einschalten</button>
+          <button id="button-push-install" class="button button-small" type="button" hidden>Anleitung</button>
+          <button id="button-push-test" class="button button-small" type="button" hidden>Test schicken</button>
+          <button id="button-push-off" class="button button-small" type="button" hidden>Ausschalten</button>
+        </div>
+      </div>
+
+      <div class="card device-zone">
+        <h2 class="section-title">Als App installieren</h2>
+        <p id="install-card-text" class="hint"></p>
+        <button id="button-install-again" class="button" type="button" hidden>Anleitung zeigen</button>
+      </div>
+
+      <div class="card device-zone">
+        <h2 class="section-title">Was ist neu?</h2>
+        <p class="hint">Die Neuerungen der letzten Versionen.</p>
+        <button id="button-changelog" class="button" type="button">Neuerungen ansehen</button>
+      </div>
+
+      <div class="card device-zone">
+        <h2 class="section-title">Idee oder Fehler?</h2>
+        <p class="hint">Dir fehlt etwas oder etwas funktioniert nicht? Schreib es dem Entwickler von Abgehakt – anonym.</p>
+        <button id="button-feedback" class="button" type="button">Idee oder Fehler melden</button>
+      </div>
+
+      <div class="card device-zone">
+        <h2 class="section-title">Design</h2>
+        <p class="hint">Deine Farbe für Abgehakt – gilt auf diesem Gerät, hell und dunkel passt sich weiter deinem Handy an.</p>
+        <div id="theme-swatches" class="theme-swatches" role="group" aria-label="Farbe wählen"></div>
+        <label class="theme-custom">
+          <input id="input-theme-color" type="color" value="#5e6ad2">
+          <span>Eigene Farbe wählen</span>
+        </label>
+      </div>
+
+      <div class="card device-zone">
+        <h2 class="section-title">Meine Daten</h2>
+        <p class="hint">Lade alles herunter, was Abgehakt zu dir in dieser Klasse gespeichert hat: Name, Häkchen, Notizen, private Aufgaben, Einstellungen. Löschen: unten „Klasse verlassen“.</p>
+        <p id="mydata-done" class="hint" role="status"></p>
+        <p id="error-mydata" class="error" role="alert" hidden></p>
+        <button id="button-mydata" class="button" type="button">Meine Daten herunterladen</button>
+      </div>
+
+      <div class="card device-zone">
+        <h2 class="section-title">Weiteres Gerät anmelden</h2>
+        <p class="hint">Zum Beispiel ein neues Handy oder ein Tablet: Erzeuge hier einen Code und gib ihn auf dem anderen Gerät ein. Du bist dort dieselbe Person – mit deinen Häkchen und Notizen. Dieses Gerät bleibt angemeldet.</p>
+        <div id="own-code-box"></div>
+        <p id="error-own-code" class="error" role="alert" hidden></p>
+        <button id="button-own-code" class="button" type="button">Code erzeugen</button>
+      </div>
+
+
+      <div class="card danger-zone">
+        <h2 class="section-title">Klasse verlassen</h2>
+        <p class="hint">Du verlässt die Klasse auf allen Geräten. Deine Häkchen, Notizen und privaten Aufgaben werden gelöscht, dein Name wird zu „Ehemaliges Mitglied“. Zurück kommst du nur mit einem neuen Code.</p>
+        <p id="error-leave" class="error" role="alert" hidden></p>
+        <button id="button-leave" class="button button-danger" type="button">Klasse verlassen</button>
+      </div>
+
+
+
+      <p><button id="button-settings-back" class="button" type="button">Zurück zum Heft</button></p>
+    </section>
+
+    <!-- Klasseneinstellungen (betreffen alle in der Klasse) -->
+    <section id="view-class-settings" hidden>
+      <p class="eyebrow" id="class-settings-name"></p>
+      <h1>Einstellungen</h1>
+      <div class="segmented settings-tabs" role="tablist" aria-label="Einstellungen">
+        <button type="button" role="tab" data-tab="me">Für mich</button>
+        <button type="button" role="tab" data-tab="class">Klasse</button>
+      </div>
+      <p class="muted">Gilt für die ganze Klasse.</p>
+      <p id="class-settings-readonly" class="muted" hidden>Ändern können das nur Admins.</p>
+
+      <form id="form-class-admin" class="card settings-card" hidden novalidate>
+        <h2 class="section-title">Name der Klasse</h2>
+        <label for="input-class-rename" class="visually-hidden">Name der Klasse</label>
+        <input id="input-class-rename" class="input" maxlength="60" autocomplete="off" required>
+        <p id="class-rename-saved" class="hint" role="status"></p>
+        <p id="error-class-admin" class="error" role="alert" hidden></p>
+        <button class="button button-primary" type="submit">Namen speichern</button>
+      </form>
+
+      <div id="subjects-zone" class="card settings-card" hidden>
+        <h2 class="section-title">Fächer und Stundenplan</h2>
+        <p class="hint">Fächerliste, Wahlfächer und an welchen Tagen ein Fach Unterricht hat.</p>
+        <button id="button-manage-subjects" class="button" type="button">Fächer verwalten</button>
+      </div>
+
+      <div id="deleted-zone" class="card settings-card" hidden>
+        <h2 class="section-title">Zuletzt gelöscht</h2>
+        <p class="hint">Aus Versehen gelöscht? Einträge der letzten 30 Tage lassen sich wiederherstellen.</p>
+        <button id="button-open-deleted" class="button" type="button">Gelöschte Einträge</button>
+      </div>
+
+      <div id="delete-class-zone" class="card danger-zone" hidden>
+        <h2 class="section-title">Klasse löschen</h2>
+        <p class="hint">Löscht die Klasse endgültig – mit allen Hausaufgaben, Mitgliedern, Häkchen und Notizen. Alle verlieren sofort den Zugang. Das lässt sich nicht rückgängig machen.</p>
+        <p id="error-delete-class" class="error" role="alert" hidden></p>
+        <button id="button-delete-class" class="button button-danger" type="button">Klasse endgültig löschen</button>
+      </div>
+
+      <p class="class-id hint">Kennung dieser Klasse (für Meldungen an den Betreiber): <code id="class-id"></code></p>
+
+      <p><button id="button-class-settings-back" class="button" type="button">Zurück</button></p>
+    </section>
+
+    <!-- Zuletzt gelöscht (Admins) -->
+    <section id="view-deleted" hidden>
+      <p class="eyebrow" id="deleted-class-name"></p>
+      <h1>Zuletzt gelöscht</h1>
+      <p class="muted">Gelöschte Einträge der Klasse aus den letzten 30 Tagen. „Wiederherstellen“ holt sie für alle zurück. Was der Betreiber nach einer Meldung ausgeblendet hat, steht hier nicht.</p>
+      <p id="error-deleted" class="error" role="alert" hidden></p>
+      <p id="deleted-restored" class="notice" role="status" hidden></p>
+      <ul id="deleted-list" class="invite-list"></ul>
+      <p id="deleted-empty" class="empty" hidden>Keine gelöschten Einträge.</p>
+      <p><button id="button-deleted-back" class="button" type="button">Zurück</button></p>
+    </section>
+
+    <!-- Eintrag melden -->
+    <section id="view-report" class="card" hidden>
+      <h1>Eintrag melden</h1>
+      <div class="report-snapshot">
+        <p id="report-task-subject" class="eyebrow"></p>
+        <p id="report-task-title" class="report-title"></p>
+      </div>
+      <p class="muted">Die Admins deiner Klasse sehen die Meldung und können den Eintrag entfernen. Bei schweren Verstößen prüft auch der Betreiber. Wer gemeldet hat, sieht niemand.</p>
+      <form id="form-report" novalidate>
+        <fieldset class="reason-list">
+          <legend class="section-title">Grund</legend>
+          <label class="radio"><input type="radio" name="reason" value="beleidigend"> <span>Beleidigend oder Mobbing</span></label>
+          <label class="radio"><input type="radio" name="reason" value="rechtswidrig"> <span>Rechtswidrig</span></label>
+          <label class="radio"><input type="radio" name="reason" value="spam"> <span>Spam oder Unsinn</span></label>
+          <label class="radio"><input type="radio" name="reason" value="sonstiges"> <span>Sonstiges</span></label>
+        </fieldset>
+        <label for="input-report-comment">Kurze Begründung <span class="optional">(optional)</span></label>
+        <textarea id="input-report-comment" class="input textarea" maxlength="500" rows="3"></textarea>
+        <p id="error-report" class="error" role="alert" hidden></p>
+        <div class="actions">
+          <button id="button-report-cancel" class="button" type="button">Abbrechen</button>
+          <button class="button button-danger" type="submit">Melden</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Meldungen prüfen (Admins) -->
+    <section id="view-reports" hidden>
+      <p class="eyebrow" id="reports-class-name"></p>
+      <h1>Meldungen</h1>
+      <p class="muted">Diese Einträge wurden von Mitgliedern gemeldet. Entferne sie, wenn sie gegen die Regeln verstoßen. Markierst du einen Eintrag als „in Ordnung“, schaut ihn sich zusätzlich der Betreiber an.</p>
+      <p id="error-reports" class="error" role="alert" hidden></p>
+      <ul id="report-list" class="invite-list"></ul>
+      <p id="reports-empty" class="empty" hidden>Keine offenen Meldungen.</p>
+      <p><button id="button-reports-back" class="button" type="button">Zurück zum Heft</button></p>
+    </section>
+
+    <!-- Installieren: Schritt-für-Schritt-Anleitung -->
+    <section id="view-install" class="card" hidden>
+      <p class="eyebrow" id="install-eyebrow">Fast fertig</p>
+      <h1>Abgehakt auf den Home-Bildschirm</h1>
+      <p class="muted">Dann startet Abgehakt wie eine App direkt in deinem Heft, funktioniert auch ohne Internet – und du bleibst angemeldet.</p>
+      <ol id="install-steps" class="install-steps"></ol>
+      <div id="install-code-box"></div>
+      <p id="error-install" class="error" role="alert" hidden></p>
+      <div class="actions">
+        <button id="button-install-skip" class="button" type="button">Später</button>
+        <button id="button-install-now" class="button button-primary" type="button" hidden>Jetzt installieren</button>
+        <button id="button-install-done" class="button button-primary" type="button" hidden>Weiter zum Heft</button>
+      </div>
+    </section>
+
+    <!-- Idee oder Fehler an den Entwickler -->
+    <section id="view-feedback" class="card" hidden>
+      <h1>Idee oder Fehler melden</h1>
+      <p class="muted">Deine Nachricht geht an den Entwickler von Abgehakt – <strong>anonym</strong>: Er sieht nicht, wer du bist oder in welcher Klasse du bist. Mitgeschickt werden nur App-Version und Geräteart.</p>
+      <form id="form-feedback" novalidate>
+        <fieldset class="reason-list">
+          <legend class="section-title">Worum geht es?</legend>
+          <label class="radio"><input type="radio" name="feedback-kind" value="idee"> <span>💡 Idee oder Wunsch</span></label>
+          <label class="radio"><input type="radio" name="feedback-kind" value="fehler"> <span>🐞 Etwas funktioniert nicht</span></label>
+          <label class="radio"><input type="radio" name="feedback-kind" value="sonstiges"> <span>💬 Sonstiges</span></label>
+        </fieldset>
+        <label for="input-feedback">Beschreibung</label>
+        <textarea id="input-feedback" class="input textarea" maxlength="2000" rows="5" placeholder="Was wünschst du dir? Oder: Was hast du gemacht, was ist passiert?"></textarea>
+        <p class="hint">Bitte keine Namen oder persönlichen Daten hineinschreiben. Antworten kann der Entwickler leider nicht – dafür ist es anonym.</p>
+        <p id="error-feedback" class="error" role="alert" hidden></p>
+        <div class="actions">
+          <button id="button-feedback-cancel" class="button" type="button">Abbrechen</button>
+          <button class="button button-primary" type="submit">Abschicken</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Meine Wahlfächer -->
+    <section id="view-electives" class="card" hidden>
+      <p class="eyebrow" id="electives-eyebrow"></p>
+      <h1>Deine Wahlfächer</h1>
+      <p class="muted">Kreuze die Wahlfächer an, die du hast. Hausaufgaben aus anderen Wahlfächern werden dir dann nicht angezeigt. Fächer, die alle haben, siehst du immer.</p>
+      <form id="form-electives" novalidate>
+        <fieldset id="elective-list" class="viewer-list">
+          <legend class="visually-hidden">Wahlfächer</legend>
+        </fieldset>
+        <p id="error-electives" class="error" role="alert" hidden></p>
+        <div class="actions">
+          <button id="button-electives-skip" class="button" type="button">Später</button>
+          <button class="button button-primary" type="submit">Speichern</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Fächer verwalten (Admins, Eintragende) -->
+    <section id="view-subjects" hidden>
+      <p class="eyebrow" id="subjects-class-name"></p>
+      <h1>Fächer</h1>
+      <p class="muted">Die Fächerliste eurer Klasse. Wahlfächer haben nicht alle – wer ein Wahlfach nicht gewählt hat, sieht dessen Hausaufgaben nicht.</p>
+      <p class="muted">Stundenplan: Kreuze an, an welchen Tagen ein Fach Unterricht hat. Beim Eintragen schlägt die App dann die nächste Stunde als Abgabetag vor.</p>
+      <p id="error-subjects" class="error" role="alert" hidden></p>
+      <div class="card ab-card">
+        <label class="toggle">
+          <input id="input-ab-weeks" type="checkbox">
+          <span>A/B-Wochen</span>
+          <span class="hint">Der Stundenplan wechselt jede Woche.</span>
+        </label>
+        <fieldset id="ab-current" class="ab-current" hidden>
+          <legend id="ab-current-label"></legend>
+          <label class="radio"><input type="radio" name="ab-current" value="a"> A-Woche</label>
+          <label class="radio"><input type="radio" name="ab-current" value="b"> B-Woche</label>
+        </fieldset>
+      </div>
+      <ul id="subject-admin-list" class="member-list"></ul>
+      <p id="subjects-empty" class="empty" hidden>Noch keine Fächer. Lege unten das erste an.</p>
+      <form id="form-subject" class="card" novalidate>
+        <h2 class="section-title">Neues Fach</h2>
+        <label for="input-subject-name">Name</label>
+        <input id="input-subject-name" class="input" maxlength="40" autocomplete="off" placeholder="z. B. Spanisch">
+        <label class="toggle">
+          <input id="input-subject-elective" type="checkbox">
+          <span>Wahlfach</span>
+          <span class="hint">Nicht alle in der Klasse haben dieses Fach.</span>
+        </label>
+        <button class="button button-primary" type="submit">Fach anlegen</button>
+      </form>
+    </section>
+
+    <!-- Was ist neu -->
+    <section id="view-changelog" hidden>
+      <p class="eyebrow" id="changelog-version"></p>
+      <h1>Was ist neu</h1>
+      <div id="changelog-list"></div>
+      <p><button id="button-changelog-back" class="button" type="button">Zurück</button></p>
+    </section>
+
+    <!-- Hinweis, z. B. wenn man entfernt wurde -->
+    <p id="notice" class="notice" role="status" hidden></p>
+  </main>
+
+  <footer class="footer">
+    <nav class="legal-nav" aria-label="Rechtliches"><a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a></nav>
+    <span class="status">Version 0.36.2</span>
+  </footer>
+</body>
+</html>

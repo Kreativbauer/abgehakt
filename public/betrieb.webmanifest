@@ -1,0 +1,17 @@
+{
+  "name": "Abgehakt – Betrieb",
+  "short_name": "Betrieb",
+  "description": "Not-Werkzeug des Betreibers von Abgehakt.",
+  "lang": "de",
+  "id": "/betrieb",
+  "start_url": "/betrieb",
+  "scope": "/betrieb",
+  "display": "standalone",
+  "background_color": "#08090a",
+  "theme_color": "#08090a",
+  "icons": [
+    { "src": "/icons/betrieb-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/betrieb-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/betrieb-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

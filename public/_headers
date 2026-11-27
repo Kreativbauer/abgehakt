@@ -1,0 +1,67 @@
+# Sicherheits-Header für alle statischen Dateien.
+# Strenge CSP: kein Inline-Code (kein <script>…</script>, kein style="…", keine onclick="…"),
+# keine fremden Skripte, Schriften oder Bilder. default-src 'none': Alles, was nicht ausdrücklich erlaubt ist
+# (z. B. iframes, Audio/Video), ist verboten – neue Arten von Inhalten brauchen eine eigene Zeile.
+/*
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Frame-Options: DENY
+
+# HTML nie lange cachen, damit neue Versionen sofort ankommen.
+# VORERST NICHT ÖFFENTLICH: Startseite und Bild der App mit noindex (nicht in Suchmaschinen).
+# Zum Veröffentlichen: die drei X-Robots-Tag-Zeilen hier, <meta name="robots"> in index.html
+# und die Sitemap-Zeile in robots.txt wieder herstellen (siehe CLAUDE.md).
+/
+  Cache-Control: no-cache
+  X-Robots-Tag: noindex, nofollow
+/index.html
+  Cache-Control: no-cache
+  X-Robots-Tag: noindex, nofollow
+/img/*
+  X-Robots-Tag: noindex, nofollow
+
+# Die App (Klassen-Hefte) nie in Suchmaschinen, HTML nie lange cachen.
+/app
+  Cache-Control: no-cache
+  X-Robots-Tag: noindex, nofollow
+/app/*
+  Cache-Control: no-cache
+  X-Robots-Tag: noindex, nofollow
+
+# CSS/JS werden über ?v=<Version> im HTML neu geladen und dürfen lange gecacht werden.
+/css/*
+  Cache-Control: public, max-age=31536000, immutable
+/js/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Service Worker immer frisch laden, damit Updates sofort ankommen.
+/sw.js
+  Cache-Control: no-cache
+/betrieb-sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: no-cache
+/betrieb.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: no-cache
+
+# Not-Werkzeug des Betreibers: nie in Suchmaschinen, nie cachen.
+/betrieb
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow
+
+# Impressum und Datenschutz: für Besucher erreichbar, aber nicht in Suchmaschinen
+# (beide enthalten Name und Anschrift des Betreibers).
+/impressum
+  X-Robots-Tag: noindex, follow
+/impressum.html
+  X-Robots-Tag: noindex, follow
+/datenschutz
+  X-Robots-Tag: noindex, follow
+/datenschutz.html
+  X-Robots-Tag: noindex, follow

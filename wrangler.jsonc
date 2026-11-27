@@ -1,0 +1,94 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "abgehakt",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+
+  // Statische Dateien (HTML, CSS, JS, Bilder) liegen in /public.
+  // Nur /api/* läuft zuerst durch den Worker, alles andere liefert Cloudflare direkt aus.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // D1-Datenbank „abgehakt-db“ (ID aus dem Cloudflare-Dashboard).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "abgehakt-db",
+      "database_id": "c41d811c-acb6-4f5f-a2d9-8877940fa2eb",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Begrenzung pro IP für Code-Eingaben: 60 Versuche pro Minute. Großzügig, weil eine ganze
+  // Klasse über das Schul-WLAN mit derselben IP beitreten kann – reicht trotzdem, um das
+  // Durchprobieren von Codes praktisch unmöglich zu machen.
+  "ratelimits": [
+    {
+      "name": "CODE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 60, "period": 60 }
+    }
+  ],
+
+  // Absender der Anmeldecodes. Ohne eigene Domain nur die Testadresse von Resend
+  // (schickt dann nur an die E-Mail des Resend-Kontos). Der Schlüssel RESEND_API_KEY
+  // liegt als Secret bei Cloudflare, nie im Repository.
+  "vars": {
+    "EMAIL_FROM": "Abgehakt <onboarding@resend.dev>",
+    "APP_URL": "https://abgehakt.nilskaplan8.workers.dev/app/",
+    // Absender-Angabe für Benachrichtigungen (VAPID). Die Schlüssel VAPID_PUBLIC_KEY und VAPID_PRIVATE_KEY
+    // liegen als Secrets bei Cloudflare (eingetragen); ohne sie sind Benachrichtigungen aus.
+    "VAPID_SUBJECT": "mailto:info@skyhome42.de"
+  },
+
+  // Täglicher Lauf um 02:23 UTC (≈ 3–4 Uhr nachts in Deutschland): inaktive Klassen warnen und
+  // löschen, abgelaufene Anmeldecodes und verwaiste Admin-Konten aufräumen (src/jobs/cleanup.js).
+  // Alle 5 Minuten: Benachrichtigungen verschicken (src/jobs/notify.js). Der tägliche Zeitplan muss
+  // mit DAILY_CRON in src/worker.js übereinstimmen.
+  "triggers": {
+    "crons": ["23 2 * * *", "*/5 * * * *"]
+  },
+
+  "observability": { "enabled": true },
+
+  // Testversion: eigener Worker „abgehakt-test“ mit eigener Datenbank „abgehakt-test-db“ – nie die echten Daten.
+  // Jeder Pull Request wird automatisch hierhin veröffentlicht (deploy.yml), bevor er gemergt wird:
+  // https://abgehakt-test.nilskaplan8.workers.dev/app/
+  // Secrets (RESEND_API_KEY, VAPID_*, eigener OPERATOR_KEY) setzt Nils beim Worker „abgehakt-test“ in Cloudflare.
+  // d1_databases, ratelimits, vars und triggers werden nicht vom Haupt-Worker geerbt – deshalb hier vollständig.
+  "env": {
+    "test": {
+      "name": "abgehakt-test",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "abgehakt-test-db",
+          "database_id": "28b417cc-6268-4cc1-92d5-d93879d10399",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "CODE_LIMITER",
+          "namespace_id": "1002",
+          "simple": { "limit": 60, "period": 60 }
+        }
+      ],
+      "vars": {
+        "EMAIL_FROM": "Abgehakt Test <onboarding@resend.dev>",
+        "APP_URL": "https://abgehakt-test.nilskaplan8.workers.dev/app/",
+        "VAPID_SUBJECT": "mailto:info@skyhome42.de",
+        // Nur hier: Anmeldecodes ohne E-Mail direkt in der App anzeigen (src/api/account.js). Nie beim echten Worker!
+        "TEST_SHOW_CODES": "1"
+      },
+      "triggers": {
+        "crons": ["23 2 * * *", "*/5 * * * *"]
+      }
+    }
+  }
+}

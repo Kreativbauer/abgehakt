@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+# /app/, /betrieb, /impressum und /datenschutz sind bewusst NICHT gesperrt: Sie tragen „noindex“,
+# und das kann Google nur lesen, wenn es die Seiten abrufen darf.
+
+# Vorerst nicht veröffentlicht: Startseite trägt noindex, deshalb keine Sitemap.
+# Zum Veröffentlichen wieder eintragen:
+# Sitemap: https://abgehakt.nilskaplan8.workers.dev/sitemap.xml

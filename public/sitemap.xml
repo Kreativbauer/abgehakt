@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Nur die öffentliche Startseite. Impressum/Datenschutz sind noindex, die App sowieso.
+     Bei eigener Domain die Adresse hier, in robots.txt und in index.html (canonical, og:*) anpassen. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://abgehakt.nilskaplan8.workers.dev/</loc>
+  </url>
+</urlset>

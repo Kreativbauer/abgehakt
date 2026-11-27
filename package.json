@@ -1,0 +1,19 @@
+{
+  "name": "abgehakt",
+  "version": "0.36.2",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "description": "Abgehakt – das kostenlose Klassen-Hausaufgabenheft (Cloudflare Workers + D1)",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "check": "node scripts/check-version.js",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "deploy": "wrangler deploy",
+    "class:create": "node scripts/create-class.js"
+  },
+  "devDependencies": {
+    "wrangler": "4.158.0"
+  }
+}

@@ -1,0 +1,160 @@
+name: Veröffentlichen
+
+# Läuft bei jedem Push auf main (also auch nach dem Mergen eines Pull Requests)
+# und lässt sich unter „Actions“ zusätzlich von Hand starten.
+# Pull Requests: prüfen und auf die Testversion (abgehakt-test) veröffentlichen.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Nie zwei Deploys gleichzeitig.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Regeln prüfen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Regelprüfung (Version, CSP, Migrationen)
+        run: node scripts/check-version.js "${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}"
+
+  # Testversion: jeder Pull Request (aus diesem Repository) landet zuerst auf abgehakt-test – mit eigener
+  # Datenbank, nie den echten Daten. Erst das Mergen veröffentlicht auf der echten Adresse.
+  deploy-test:
+    name: Testversion veröffentlichen
+    needs: check
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-test
+      cancel-in-progress: false
+    environment:
+      name: test
+      url: https://abgehakt-test.nilskaplan8.workers.dev/app/
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # für die Build-Nummer (Commits dieses Pull Requests)
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm ci
+      # Ein Pull Request sammelt mehrere Änderungen unter EINER Versionsnummer (erst das Mergen zählt). Die Testversion
+      # zeigt zusätzlich die Build-Nummer: „Version 0.36.0-3“ = dritter Stand dieses PRs. Gesetzt in package.json
+      # (→ /api/health), in der angezeigten Version und – mit Laufnummer, damit jede Fassung neu geladen wird – im
+      # Offline-Speicher (sw.js, ?v=). Nur hier im Ablauf, wird nicht committet.
+      - name: Build-Nummer der Testversion setzen
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          V=$(node -p "require('./package.json').version")
+          N=$(git rev-list --count "$BASE_SHA..$HEAD_SHA")
+          SHOWN="$V-$N"
+          CACHE="$SHOWN.$GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT"
+          sed -i "s/const VERSION = \"$V\"/const VERSION = \"$CACHE\"/" public/sw.js
+          grep -rl --include='*.html' "$V" public | xargs sed -i -e "s/?v=$V\b/?v=$CACHE/g" -e "s/Version $V\b/Version $SHOWN/g"
+          sed -i "s/\"version\": \"$V\"/\"version\": \"$SHOWN\"/" package.json
+          grep -q "const VERSION = \"$CACHE\"" public/sw.js
+          grep -q "\"version\": \"$SHOWN\"" package.json
+          echo "Testversion: Version $SHOWN (Offline-Speicher $CACHE)" | tee -a "$GITHUB_STEP_SUMMARY"
+      # Anschrift steht nicht im Code, nur als Secret (fehlt sie, zeigt die Testversion einen Hinweistext).
+      - name: Anschrift für Impressum einsetzen
+        env:
+          ANSCHRIFT_STRASSE: ${{ secrets.ANSCHRIFT_STRASSE }}
+          ANSCHRIFT_ORT: ${{ secrets.ANSCHRIFT_ORT }}
+        run: node scripts/anschrift-einsetzen.js
+      - name: Datenbank-Migrationen anwenden (Test-Datenbank)
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 migrations apply DB --remote --env test
+      - name: Testversion veröffentlichen
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --env test
+      # Eigene Benachrichtigungs-Schlüssel (VAPID) nur für die Testversion – einmalig, wenn sie noch fehlen.
+      # Werden hier erzeugt und direkt als Secret beim Worker abgehakt-test gespeichert; niemand sieht sie.
+      # Die Schlüssel des echten Workers bleiben unberührt (dort nie neu erzeugen!).
+      - name: Benachrichtigungs-Schlüssel der Testversion (nur beim ersten Mal)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if ! LIST=$(npx wrangler secret list --env test 2>/dev/null); then
+            echo "::warning::Secrets der Testversion ließen sich nicht abfragen – Schlüssel nicht angelegt."; exit 0
+          fi
+          if echo "$LIST" | grep -q '"VAPID_PRIVATE_KEY"'; then
+            echo "Benachrichtigungs-Schlüssel sind schon vorhanden."; exit 0
+          fi
+          umask 077
+          node -e '
+            const c = require("crypto");
+            const { publicKey, privateKey } = c.generateKeyPairSync("ec", { namedCurve: "P-256" });
+            const pub = publicKey.export({ format: "jwk" }), priv = privateKey.export({ format: "jwk" });
+            const raw = Buffer.concat([Buffer.from([4]), Buffer.from(pub.x, "base64url"), Buffer.from(pub.y, "base64url")]);
+            process.stdout.write(JSON.stringify({ VAPID_PUBLIC_KEY: raw.toString("base64url"), VAPID_PRIVATE_KEY: priv.d }));
+          ' > vapid-test.json
+          npx wrangler secret bulk vapid-test.json --env test
+          rm -f vapid-test.json
+          echo "Neue Benachrichtigungs-Schlüssel für die Testversion gespeichert."
+
+      - name: Link anzeigen
+        run: |
+          {
+            echo "## Testversion ist online"
+            echo ""
+            echo "https://abgehakt-test.nilskaplan8.workers.dev/app/ – eigene Datenbank, echte Daten bleiben unberührt."
+            echo "Passt alles? Dann den Pull Request mergen – erst das veröffentlicht auf der echten Adresse."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Bei Cloudflare veröffentlichen
+    needs: check
+    # Pull Requests werden nur geprüft, veröffentlicht wird nur von main.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm ci
+      # Anschrift steht nicht im Code, nur als Secret – fehlt sie, wird nicht veröffentlicht (Impressumspflicht).
+      - name: Anschrift für Impressum einsetzen
+        env:
+          ANSCHRIFT_STRASSE: ${{ secrets.ANSCHRIFT_STRASSE }}
+          ANSCHRIFT_ORT: ${{ secrets.ANSCHRIFT_ORT }}
+        run: node scripts/anschrift-einsetzen.js --pflicht
+      - name: Datenbank-Migrationen anwenden
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 migrations apply DB --remote
+      - name: Worker und Dateien veröffentlichen
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
