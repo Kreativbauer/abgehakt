@@ -1,4 +1,4 @@
-// Legt eine Klasse mit Einladungscode an – Übergangslösung, bis es die Admin-Anmeldung gibt.
+// Legt eine Testklasse mit Einladungscode an (zum Ausprobieren ohne Admin-Anmeldung).
 //
 //   npm run class:create -- "8b Test"            → lokale Testdatenbank
 //   npm run class:create -- "8b Test" --remote   → echte Datenbank (nur von Nils auszuführen)

@@ -19,7 +19,10 @@ const MAX_ACTIVE_INVITES = 10;
 const CLASS_NAME_MAX = 60;
 
 function cleanClassName(input) {
-  const name = typeof input === "string" ? input.normalize("NFC").replace(/\s+/g, " ").trim() : "";
+  // Wie bei Personennamen: keine Steuer- und Richtungszeichen (landen sonst z. B. im Betreff von E-Mails).
+  const name = typeof input === "string"
+    ? input.normalize("NFC").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, "").replace(/\s+/g, " ").trim()
+    : "";
   if (!name) throw new ApiError(400, "Bitte einen Namen für die Klasse eingeben.");
   if ([...name].length > CLASS_NAME_MAX) throw new ApiError(400, `Der Klassenname darf höchstens ${CLASS_NAME_MAX} Zeichen haben.`);
   return name;
@@ -120,7 +123,7 @@ export async function revokeInvite(request, env, { code }) {
   const result = await env.DB.prepare(
     "UPDATE join_codes SET revoked_at = ? WHERE code = ? AND class_id = ? AND kind = 'invite' AND revoked_at IS NULL"
   ).bind(Date.now(), normalizeCode(code), classInfo.id).run();
-  if (result.meta.changes !== 1) throw new ApiError(404, "Diesen Code gibt es nicht (mehr).");
+  if (result.meta.changes !== 1) throw new ApiError(404, "Diesen Code gibt es nicht mehr.");
   return json({ ok: true });
 }
 

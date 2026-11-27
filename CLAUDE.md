@@ -38,7 +38,8 @@ Das vollständige Konzept steht in `KONZEPT.md` – bei inhaltlichen Fragen dort
      in `src/lib/purge.js`: Person verlässt die Klasse / wird entfernt (Häkchen, Notizen, private
      Aufgaben löschen, Name → „Ehemaliges Mitglied“), Klasse löschen (Admin, Not-Werkzeug,
      12 Monate ohne Aktivität), Aufräumen im täglichen Lauf (`src/jobs/cleanup.js`), Benachrichtigungen
-     (Abo ausschalten/ungültig, Warteschlange nach Versand). Aufgaben löschen = nur ausblenden (`deleted_at`).
+     (Abo ausschalten/ungültig, Gerätewechsel per Admin-Code, Warteschlange nach Versand), Admin-Anmeldungen nach
+     90 Tagen ohne Nutzung. Aufgaben löschen = nur ausblenden (`deleted_at`).
 
 3. **Strenge CSP, kein Inline-Code.**
    - Kein `<script>` mit Inhalt, kein `<style>`-Block, kein `style="…"`, keine `onclick="…"`,
@@ -103,13 +104,20 @@ wrangler.jsonc       Cloudflare-Konfiguration (Worker, Assets, D1, Rate-Limit)
 - Ein Gerät kann in mehreren Klassen sein: ein Schlüssel pro Klasse.
 - Codes: 8 Zeichen ohne 0/O/1/I/L, angezeigt als `XXXX-XXXX`. Einladungslink: `/app/#code=XXXXXXXX`
   (im `#`-Teil, damit der Code nicht in Server-Logs landet).
-- Code-Endpunkte sind pro IP begrenzt (`CODE_LIMITER`, 60/Minute – Schulklassen teilen sich eine IP).
+- Code-Endpunkte sind pro IP begrenzt (`CODE_LIMITER`, 60/Minute – Schulklassen teilen sich eine IP), mit **getrennten
+  Zählern je Bereich** (`limit` in `ROUTES`: `code-check`, `join`, `login-start`, `login`, `operator`). Anmelde-E-Mails
+  zusätzlich `LOGIN_LIMITER` (5/Minute/IP), ebenso das Passwort der Testversion.
+- Beitreten mit Einladungscode: höchstens `MAX_MEMBERS` (200) Personen pro Klasse (`src/api/join.js`).
 - Entfernen = `removed_at` setzen; das Gerät verliert sofort den Zugang.
 
 ## Admin-Anmeldung (Technik)
 
 - Nur Admins haben ein Konto (`accounts`, E-Mail klein geschrieben). Anmeldung per 6-stelligem
-  Code aus der E-Mail (`login_codes`: 10 Minuten gültig, 5 Versuche, max. 3 Codes pro 15 Minuten).
+  Code aus der E-Mail (`login_codes`: 10 Minuten gültig, 5 Versuche, max. 3 Codes pro 15 Minuten). Zusätzlich:
+  10 Fehlversuche pro Adresse in 24 Stunden → gesperrt; höchstens 60 Anmelde-E-Mails pro Tag insgesamt (Rest des
+  Resend-Kontingents für Löschwarnungen); scheitert der Versand, wird der Code sofort entwertet.
+- Konto-Schlüssel (`account_sessions`) verfallen nach 90 Tagen ohne Nutzung (`ACCOUNT_SESSION_MAX_IDLE_MS` in
+  `src/lib/auth.js`, der tägliche Lauf löscht sie).
 - Nach der Anmeldung: Konto-Schlüssel (`account_sessions`) für „Klasse anlegen“. In der Klasse
   handelt ein Admin wie alle anderen über seinen Geräte-Schlüssel (`requireAdmin()`).
 - Einstiege: „Klasse anlegen“ (danach Formular), „Du bist schon Admin? Mit E-Mail anmelden“ (holt alle
@@ -136,7 +144,11 @@ wrangler.jsonc       Cloudflare-Konfiguration (Worker, Assets, D1, Rate-Limit)
   der letzte Admin kann weder herabgestuft werden noch austreten.
 - Persönlicher Code: 7 Tage, einmal nutzbar; ein neuer Code macht ältere derselben Person ungültig.
   Admins erzeugen ihn für andere, jede Person auch für sich selbst (`POST /api/me/code`, „Weiteres
-  Gerät anmelden“ in den Einstellungen). Bisherige Geräte bleiben dabei angemeldet.
+  Gerät anmelden“ in den Einstellungen). **Selbst erzeugt:** bisherige Geräte bleiben angemeldet. **Vom Admin für eine
+  andere Person erzeugt** (`join_codes.created_by != member_id`) = Gerätewechsel: Beim Einlösen werden die bisherigen
+  Geräte abgemeldet und ihre Benachrichtigungs-Abos gelöscht (`replaceDevicesStmts()` in `src/lib/purge.js`) – sonst
+  könnte ein Admin unbemerkt private Aufgaben und Notizen mitlesen. Die Installations-Anleitung merkt sich ihren Code
+  (`abgehakt.installCode.<classId>`), damit nicht jedes Neuladen einen neuen erzeugt.
 - Entfernen / Austreten (`removeMemberStmts()` in `src/lib/purge.js`): `members.removed_at`, Name →
   „Ehemaliges Mitglied“, Häkchen/Notizen/private Aufgaben gelöscht, Geräte und persönliche Codes ungültig.
 - Meine Daten (Auskunft/Datenübertragbarkeit, Art. 15/20): „Einstellungen → Für mich → Meine Daten“ →
@@ -182,8 +194,9 @@ wrangler.jsonc       Cloudflare-Konfiguration (Worker, Assets, D1, Rate-Limit)
 ## Ideen und Fehler (Technik)
 
 - „Idee oder Fehler?“ (Fußzeile im Heft, Einstellungen) → `POST /api/feedback` (Art + Text, max. 5/Tag).
-  Anonym: gespeichert werden nur Text, Art, App-Version, grobe Geräteart und `sender_hash`
-  (SHA-256 der member-ID, nur zur Begrenzung) – keine Person, keine Klasse.
+  Anonym: gespeichert werden nur Text, Art, App-Version und grobe Geräteart – keine Person, keine Klasse
+  (`feedback.sender_hash` ist für neue Nachrichten leer). Die Begrenzung steht getrennt in `feedback_limits`
+  (SHA-256 der member-ID + Uhrzeit, Migration 0017), der tägliche Lauf löscht sie nach 24 Stunden.
 - Betreiber liest in `/betrieb` → „Feedback laden“, hakt ab („Erledigt“). Täglicher Lauf löscht
   Erledigtes nach 6 Monaten, alles nach spätestens 12 Monaten.
 
@@ -199,7 +212,8 @@ wrangler.jsonc       Cloudflare-Konfiguration (Worker, Assets, D1, Rate-Limit)
 - Klassen seit 11 Monaten inaktiv (`classes.last_active_at`) → Warn-E-Mail an alle Admins mit Konto,
   `classes.deletion_warned_at` setzen. Gelöscht wird erst bei 12 Monaten Inaktivität **und** frühestens
   30 Tage nach der Warnung. Aktivität nach der Warnung (`last_active_at > deletion_warned_at`) hebt sie auf.
-- Aufräumen: erledigte Meldungen und Feedback nach 6 Monaten (Feedback spätestens nach 12), Anmeldecodes nach 1 Tag, Admin-Konten ohne Klasse
+- Aufräumen: erledigte Meldungen und Feedback nach 6 Monaten (Feedback spätestens nach 12), Anmeldecodes nach 1 Tag,
+  `feedback_limits` nach 1 Tag, Admin-Anmeldungen nach 90 Tagen ohne Nutzung, Admin-Konten ohne Klasse
   nach 12 Monaten ohne Anmeldung.
 - Höchstens 40 Warnungen/Löschungen pro Lauf (Resend kostenlos: 100 E-Mails/Tag).
 - Lokal testen: `npm run dev`, dann
@@ -334,8 +348,9 @@ wrangler.jsonc       Cloudflare-Konfiguration (Worker, Assets, D1, Rate-Limit)
   Erinnerung am Vorabend, Termine (morgen und in 3 Tagen), neue Einträge (standardmäßig aus), für Admins „Meldungen“
   (`notify_reports`, standardmäßig an; `enqueueReportForAdmins()` beim Melden – ohne Inhalt, ohne meldende Person). Einstellungen → Für mich → Benachrichtigungen;
   einmaliger Hinweis im Heft (`abgehakt.pushHintDone`). iPhone/iPad nur als installierte App.
-- Versand im Cron alle 5 Minuten (`src/jobs/notify.js`), höchstens 15 pro Lauf (kostenloser Tarif: 50 Anfragen, wenig
-  CPU): zuerst die Warteschlange `push_outbox` („Neu: …“, beim Eintragen über `enqueueNewTask()` gefüllt, Wahlfächer
+- Versand im Cron alle 5 Minuten (`src/jobs/notify.js`), höchstens 25 pro Lauf (kostenloser Tarif: 50 ausgehende Anfragen
+  und 50 D1-Abfragen pro Aufruf, wenig CPU – Warteschlangen per `batch` löschen, Erinnerungen gesammelt als erledigt
+  markieren, höchstens 25 Personen prüfen; VAPID-Header pro Push-Dienst ~11 Stunden wiederverwenden): zuerst die Warteschlange `push_outbox` („Neu: …“, beim Eintragen über `enqueueNewTask()` gefüllt, Wahlfächer
   beachtet, verfällt nach 1 Tag), dann die Erinnerungen (deutsche Zeit, höchstens 3 Stunden nach der gewählten Uhrzeit,
   einmal pro Tag über `last_reminder_date`). 404/410 vom Push-Dienst → Abo löschen.
 - Service Worker zeigt an (`push`) und öffnet beim Antippen das Heft (`notificationclick`).
@@ -383,7 +398,7 @@ Die öffentliche Adresse steht an diesen Stellen – bei eigener Domain alle zus
   `OPERATOR_KEY` setzt Nils bei Bedarf beim Worker `abgehakt-test`. Lokal: `npx wrangler deploy --env test --dry-run`.
   **Passwort-Schutz** (`src/lib/testgate.js`): In `env.test` läuft der Worker für jede Anfrage zuerst (`run_worker_first: true`),
   `TEST_GATE=1` + Hostname `abgehakt-test.` aktivieren ihn. Ohne Cookie zeigt jede Seite ein Passwort-Formular
-  (`POST /__test-login`, Rate-Limit), die API antwortet 401 `test_locked`; frei sind nur Manifest, Symbole und CSS. Passwort =
+  (`POST /__test-login`, `LOGIN_LIMITER`), die API antwortet 403 `test_locked` (nicht 401 – sonst nähme die App die Klasse vom Gerät); frei sind nur Manifest, Symbole und CSS. Passwort =
   GitHub-Secret `TEST_PASSWORD`, `deploy-test` überträgt es als Worker-Secret (fehlt es → gesperrt). Cookie = HMAC des Passworts,
   1 Jahr; neues Passwort meldet alle ab. Lokal testen: `npx wrangler dev --env test --var TEST_PASSWORD:…` und Header
   `Host: abgehakt-test.nilskaplan8.workers.dev`.

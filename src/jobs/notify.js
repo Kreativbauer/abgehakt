@@ -4,8 +4,10 @@
 //   2. Erinnerung am Vorabend zur gewählten Uhrzeit (deutsche Zeit): was für morgen noch offen ist,
 //      dazu Termine morgen und in 3 Tagen
 //
-// Pro Lauf höchstens MAX_SENDS Benachrichtigungen – der kostenlose Cloudflare-Tarif erlaubt pro Lauf
-// höchstens 50 ausgehende Anfragen und wenig Rechenzeit. Was nicht drankommt, folgt im nächsten Lauf.
+// Pro Lauf höchstens MAX_SENDS Benachrichtigungen – der kostenlose Cloudflare-Tarif erlaubt pro Lauf höchstens
+// 50 ausgehende Anfragen, 50 Datenbank-Abfragen und wenig Rechenzeit. Deshalb: Warteschlangen gesammelt löschen,
+// Erinnerungen gesammelt als erledigt markieren, höchstens MAX_REMINDER_CHECKS Personen prüfen (je 1 Abfrage).
+// Was nicht drankommt, folgt im nächsten Lauf (alle 5 Minuten).
 import {
   deleteOperatorOutboxStmt, deleteOperatorPushStmts, deleteOutboxStmt, deletePushSubscriptionStmts,
   deleteStaleOperatorOutboxStmt, deleteStaleOutboxStmt,
@@ -13,7 +15,8 @@ import {
 import { pushConfigured, sendPush } from "../lib/webpush.js";
 import { taskLabel } from "../api/push.js";
 
-const MAX_SENDS = 15;
+const MAX_SENDS = 25;
+const MAX_REMINDER_CHECKS = 25;
 const OUTBOX_MAX_AGE = 24 * 60 * 60 * 1000;   // nicht verschickte „Neu“-Nachrichten nach 1 Tag verwerfen
 const LATE_HOURS = 3;                          // Erinnerung höchstens 3 Stunden nach der gewählten Uhrzeit
 
@@ -60,10 +63,8 @@ async function sendOperatorOutbox(env, now, budget, stats) {
        FROM operator_push_outbox o JOIN operator_push_subscriptions s ON s.id = o.subscription_id
       ORDER BY o.created_at LIMIT ?`
   ).bind(budget).all();
-  for (const row of results) {
-    await deleteOperatorOutboxStmt(env, row.outbox_id).run();
-    await deliver(env, row, JSON.parse(row.payload), stats, deleteOperatorPushStmts);
-  }
+  if (results.length) await env.DB.batch(results.map((row) => deleteOperatorOutboxStmt(env, row.outbox_id)));
+  for (const row of results) await deliver(env, row, JSON.parse(row.payload), stats, deleteOperatorPushStmts);
   return results.length;
 }
 
@@ -74,10 +75,8 @@ async function sendOutbox(env, now, budget, stats) {
        FROM push_outbox o JOIN push_subscriptions s ON s.id = o.subscription_id
       ORDER BY o.created_at LIMIT ?`
   ).bind(budget).all();
-  for (const row of results) {
-    await deleteOutboxStmt(env, row.outbox_id).run();
-    await deliver(env, row, JSON.parse(row.payload), stats);
-  }
+  if (results.length) await env.DB.batch(results.map((row) => deleteOutboxStmt(env, row.outbox_id)));
+  for (const row of results) await deliver(env, row, JSON.parse(row.payload), stats);
   return results.length;
 }
 
@@ -126,13 +125,25 @@ async function sendReminders(env, now, budget, stats) {
         AND s.remind_hour <= ?1 AND ?1 < s.remind_hour + ${LATE_HOURS}
         AND (s.last_reminder_date IS NULL OR s.last_reminder_date != ?2)
       LIMIT ?3`
-  ).bind(hour, date, budget).all();
-  for (const sub of results) {
-    // Erst als erledigt markieren – so gibt es auch bei einem Fehler keine doppelte Erinnerung.
-    await env.DB.prepare("UPDATE push_subscriptions SET last_reminder_date = ? WHERE id = ?").bind(date, sub.id).run();
-    const message = await reminderMessage(env, sub, date);
-    if (message) await deliver(env, sub, message, stats);
-    else stats.nothing++;
+  ).bind(hour, date, MAX_REMINDER_CHECKS).all();
+  // Personen ohne etwas für morgen kosten nur eine Abfrage, keine Nachricht – sie zählen nicht zum Budget.
+  const done = [];
+  let sent = 0;
+  try {
+    for (const sub of results) {
+      if (sent >= budget) break;
+      done.push(sub.id);
+      const message = await reminderMessage(env, sub, date);
+      if (message) { await deliver(env, sub, message, stats); sent++; }
+      else stats.nothing++;
+    }
+  } finally {
+    // Gesammelt als erledigt markieren (eine Abfrage statt einer pro Person).
+    if (done.length) {
+      await env.DB.prepare(
+        "UPDATE push_subscriptions SET last_reminder_date = ? WHERE id IN (SELECT value FROM json_each(?))"
+      ).bind(date, JSON.stringify(done)).run();
+    }
   }
 }
 

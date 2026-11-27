@@ -107,7 +107,7 @@ async function loadSubject(env, classId, id) {
   const row = await env.DB.prepare(
     "SELECT id, name, elective, days_a, days_b FROM subjects WHERE id = ? AND class_id = ? AND archived_at IS NULL"
   ).bind(id, classId).first();
-  if (!row) throw new ApiError(404, "Dieses Fach gibt es nicht (mehr).");
+  if (!row) throw new ApiError(404, "Dieses Fach gibt es nicht mehr.");
   return row;
 }
 

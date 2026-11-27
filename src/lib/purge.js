@@ -30,9 +30,28 @@ export function removeMemberStmts(env, memberId, now) {
     env.DB.prepare("DELETE FROM tasks WHERE owner_member_id = ?").bind(memberId),
     env.DB.prepare(
       `UPDATE members SET removed_at = ?, name = ?, account_id = NULL,
-              status_visibility = 'none', status_viewers = '[]', elective_ids = '[]'
+              status_visibility = 'none', status_viewers = '[]', elective_ids = '[]',
+              electives_chosen_at = NULL, editor_subject_ids = '[]'
         WHERE id = ? AND removed_at IS NULL`
     ).bind(now, FORMER_MEMBER_NAME, memberId),
+  ];
+}
+
+/**
+ * Gerätewechsel mit einem persönlichen Code, den ein Admin erzeugt hat: alle bisherigen Geräte der Person abmelden
+ * (außer dem neuen) und ihre Benachrichtigungs-Abos löschen – sonst bekämen die alten Geräte weiter Nachrichten.
+ * Nur wenn das neue Gerät wirklich angelegt wurde (EXISTS), damit niemand ohne Gerät dasteht.
+ */
+export function replaceDevicesStmts(env, memberId, newTokenHash, now) {
+  const created = "EXISTS (SELECT 1 FROM devices WHERE token_hash = ?2 AND member_id = ?1)";
+  return [
+    env.DB.prepare(
+      `UPDATE devices SET revoked_at = ?3 WHERE member_id = ?1 AND token_hash != ?2 AND revoked_at IS NULL AND ${created}`
+    ).bind(memberId, newTokenHash, now),
+    env.DB.prepare(
+      `DELETE FROM push_outbox WHERE subscription_id IN (SELECT id FROM push_subscriptions WHERE member_id = ?1) AND ${created}`
+    ).bind(memberId, newTokenHash),
+    env.DB.prepare(`DELETE FROM push_subscriptions WHERE member_id = ?1 AND ${created}`).bind(memberId, newTokenHash),
   ];
 }
 

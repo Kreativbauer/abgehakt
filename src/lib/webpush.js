@@ -72,15 +72,29 @@ async function vapidKey(env) {
   return signingKey;
 }
 
+// Signierter VAPID-Header pro Push-Dienst, 12 Stunden gültig – wird wiederverwendet, solange er noch mindestens
+// 1 Stunde gilt (spart pro Nachricht eine ECDSA-Signatur = CPU-Zeit im kostenlosen Tarif).
+const vapidCache = new Map();
+
 async function vapidAuthorization(env, endpoint) {
+  const origin = new URL(endpoint).origin;
+  const cached = vapidCache.get(origin);
+  if (cached && cached.exp - Date.now() / 1000 > 3600) return cached.value;
+  const value = await signVapid(env, origin);
+  vapidCache.set(origin, value);
+  return value.value;
+}
+
+async function signVapid(env, origin) {
+  const exp = Math.floor(Date.now() / 1000) + 12 * 3600;
   const header = b64url(enc.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
   const claims = b64url(enc.encode(JSON.stringify({
-    aud: new URL(endpoint).origin,
-    exp: Math.floor(Date.now() / 1000) + 12 * 3600,
+    aud: origin,
+    exp,
     sub: env.VAPID_SUBJECT || "mailto:info@skyhome42.de",
   })));
   const signature = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, await vapidKey(env), enc.encode(`${header}.${claims}`));
-  return `vapid t=${header}.${claims}.${b64url(signature)}, k=${String(env.VAPID_PUBLIC_KEY).trim()}`;
+  return { exp, value: `vapid t=${header}.${claims}.${b64url(signature)}, k=${String(env.VAPID_PUBLIC_KEY).trim()}` };
 }
 
 export function pushConfigured(env) {

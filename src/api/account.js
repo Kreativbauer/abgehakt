@@ -12,6 +12,18 @@ const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const MAX_CODES_PER_WINDOW = 3;           // pro E-Mail-Adresse …
 const CODE_WINDOW_MS = 15 * 60 * 1000;    // … in 15 Minuten
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MAX_FAILS_PER_DAY = 10;             // falsche Codes pro Adresse in 24 Stunden, danach gesperrt
+const MAX_MAILS_PER_DAY = 60;             // Anmelde-E-Mails insgesamt (Resend kostenlos: 100/Tag, Rest für Löschwarnungen)
+
+/** Zu viele falsche Codes für diese Adresse in den letzten 24 Stunden? */
+async function lockedOut(env, email, now) {
+  const r = await env.DB.prepare(
+    "SELECT COALESCE(SUM(attempts), 0) AS n FROM login_codes WHERE email = ? AND created_at > ?"
+  ).bind(email, now - DAY_MS).first();
+  return r.n >= MAX_FAILS_PER_DAY;
+}
+const LOCKED = () => new ApiError(429, "Zu viele falsche Codes. Die Anmeldung mit dieser Adresse ist für 24 Stunden gesperrt.", "locked");
 
 export function cleanEmail(input) {
   const email = typeof input === "string" ? input.trim().toLowerCase() : "";
@@ -34,18 +46,30 @@ export async function startLogin(request, env) {
   if (recent.n >= MAX_CODES_PER_WINDOW) {
     throw new ApiError(429, "Es wurden gerade schon mehrere Codes verschickt. Bitte in 15 Minuten erneut versuchen.", "rate_limited");
   }
+  if (await lockedOut(env, email, now)) throw LOCKED();
+  const total = await env.DB.prepare("SELECT COUNT(*) AS n FROM login_codes WHERE created_at > ?").bind(now - DAY_MS).first();
+  if (total.n >= MAX_MAILS_PER_DAY) {
+    throw new ApiError(429, "Heute wurden schon sehr viele Anmelde-Codes verschickt. Bitte morgen erneut versuchen.", "rate_limited");
+  }
 
   const code = newLoginCode();
+  const id = newId();
   await env.DB.prepare(
     "INSERT INTO login_codes (id, email, code_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)"
-  ).bind(newId(), email, await codeHash(email, code), now, now + CODE_TTL_MS).run();
+  ).bind(id, email, await codeHash(email, code), now, now + CODE_TTL_MS).run();
 
   // Nur Testversion (abgehakt-test, Variable TEST_SHOW_CODES in wrangler.jsonc → env.test): keine E-Mail, der Code
   // geht direkt an die App. Doppelt abgesichert über den Hostnamen – auf der echten Adresse passiert das nie.
   if (env.TEST_SHOW_CODES === "1" && new URL(request.url).hostname.startsWith("abgehakt-test.")) {
     return json({ ok: true, testCode: code });
   }
-  await sendLoginCode(env, email, code);
+  try {
+    await sendLoginCode(env, email, code);
+  } catch (err) {
+    // Nicht verschickt → Code sofort entwerten (sonst ließe er sich 10 Minuten lang unbemerkt erraten).
+    await env.DB.prepare("UPDATE login_codes SET used_at = ? WHERE id = ?").bind(now, id).run();
+    throw err;
+  }
   return json({ ok: true });
 }
 
@@ -55,6 +79,7 @@ export async function verifyLogin(request, env) {
   const code = typeof body.code === "string" ? body.code.replace(/\D/g, "") : "";
   if (code.length !== 6) throw new ApiError(400, "Der Code hat 6 Ziffern.", "invalid_code");
   const now = Date.now();
+  if (await lockedOut(env, email, now)) throw LOCKED();
 
   const row = await env.DB.prepare(
     `SELECT id, code_hash, attempts FROM login_codes

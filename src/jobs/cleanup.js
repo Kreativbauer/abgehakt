@@ -5,6 +5,7 @@
 //
 // „Aktiv“ = irgendjemand hat die Klasse benutzt (classes.last_active_at, siehe src/lib/auth.js).
 // Wird eine gewarnte Klasse wieder benutzt, ist last_active_at > deletion_warned_at → Warnung hinfällig.
+import { ACCOUNT_SESSION_MAX_IDLE_MS } from "../lib/auth.js";
 import { purgeClass } from "../lib/purge.js";
 import { sendDeletionWarning } from "../lib/email.js";
 
@@ -76,6 +77,15 @@ export async function runDailyCleanup(env, now = Date.now()) {
 
   const codes = await env.DB.prepare("DELETE FROM login_codes WHERE created_at < ?").bind(now - DAY).run();
   summary.loginCodes = codes.meta.changes;
+
+  // Admin-Anmeldungen, die 90 Tage nicht benutzt wurden (gelten dann ohnehin nicht mehr, siehe requireAccount).
+  const sessions = await env.DB.prepare("DELETE FROM account_sessions WHERE last_seen_at < ?")
+    .bind(now - ACCOUNT_SESSION_MAX_IDLE_MS).run();
+  summary.accountSessions = sessions.meta.changes;
+
+  // Begrenzung für Ideen/Fehler: nur 24 Stunden gebraucht.
+  const limits = await env.DB.prepare("DELETE FROM feedback_limits WHERE created_at < ?").bind(now - DAY).run();
+  summary.feedbackLimits = limits.meta.changes;
 
   const orphan = `SELECT a.id FROM accounts a
                    WHERE a.last_login_at < ?

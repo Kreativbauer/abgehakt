@@ -15,9 +15,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <link rel="stylesheet" href="/css/style.css?v=0.36.3">
-  <script src="/js/changelog.js?v=0.36.3" defer></script>
-  <script src="/js/app.js?v=0.36.3" defer></script>
+  <link rel="stylesheet" href="/css/style.css?v=0.36.4">
+  <script src="/js/changelog.js?v=0.36.4" defer></script>
+  <script src="/js/app.js?v=0.36.4" defer></script>
 </head>
 <body class="app">
   <p id="test-banner" class="test-banner" hidden>Testversion – eigene Test-Daten, nicht dein echtes Heft</p>
@@ -391,9 +391,9 @@
     <section id="view-settings" hidden>
       <p class="eyebrow" id="settings-class-name"></p>
       <h1>Einstellungen</h1>
-      <div class="segmented settings-tabs" role="tablist" aria-label="Einstellungen">
-        <button type="button" role="tab" data-tab="me">Für mich</button>
-        <button type="button" role="tab" data-tab="class">Klasse</button>
+      <div class="segmented settings-tabs" role="group" aria-label="Einstellungen">
+        <button type="button" data-tab="me">Für mich</button>
+        <button type="button" data-tab="class">Klasse</button>
       </div>
       <p class="muted">Gilt nur für dich.</p>
 
@@ -471,7 +471,7 @@
       </div>
 
       <div class="card device-zone">
-        <h2 class="section-title">Was ist neu?</h2>
+        <h2 class="section-title">Was ist neu</h2>
         <p class="hint">Die Neuerungen der letzten Versionen.</p>
         <button id="button-changelog" class="button" type="button">Neuerungen ansehen</button>
       </div>
@@ -484,7 +484,7 @@
 
       <div class="card device-zone">
         <h2 class="section-title">Design</h2>
-        <p class="hint">Deine Farbe für Abgehakt – gilt auf diesem Gerät, hell und dunkel passt sich weiter deinem Handy an.</p>
+        <p class="hint">Deine Farbe für Abgehakt – gilt auf diesem Gerät. Hell oder dunkel richtet sich weiter nach deinem Handy.</p>
         <div id="theme-swatches" class="theme-swatches" role="group" aria-label="Farbe wählen"></div>
         <label class="theme-custom">
           <input id="input-theme-color" type="color" value="#5e6ad2">
@@ -525,9 +525,9 @@
     <section id="view-class-settings" hidden>
       <p class="eyebrow" id="class-settings-name"></p>
       <h1>Einstellungen</h1>
-      <div class="segmented settings-tabs" role="tablist" aria-label="Einstellungen">
-        <button type="button" role="tab" data-tab="me">Für mich</button>
-        <button type="button" role="tab" data-tab="class">Klasse</button>
+      <div class="segmented settings-tabs" role="group" aria-label="Einstellungen">
+        <button type="button" data-tab="me">Für mich</button>
+        <button type="button" data-tab="class">Klasse</button>
       </div>
       <p class="muted">Gilt für die ganze Klasse.</p>
       <p id="class-settings-readonly" class="muted" hidden>Ändern können das nur Admins.</p>
@@ -716,7 +716,7 @@
 
   <footer class="footer">
     <nav class="legal-nav" aria-label="Rechtliches"><a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a></nav>
-    <span class="status">Version 0.36.3</span>
+    <span class="status">Version 0.36.4</span>
   </footer>
 </body>
 </html>

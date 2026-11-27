@@ -17,7 +17,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export async function requireOperator(request, env) {
   const key = env.OPERATOR_KEY || "";
-  if (key.length < 32) throw new ApiError(404, "Nicht gefunden");
+  if (key.length < 32) throw new ApiError(404, "Nicht gefunden.");
   const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
   // Hashes vergleichen: gleich lang, kein Rückschluss über die Laufzeit.
   const [a, b] = await Promise.all([sha256Hex(`op:${given}`), sha256Hex(`op:${key}`)]);
