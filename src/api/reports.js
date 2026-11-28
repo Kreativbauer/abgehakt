@@ -42,7 +42,7 @@ export function toReport(r) {
 export async function reportTask(request, env, { id }) {
   const { member, classInfo } = await requireMember(request, env);
   const body = await readJson(request);
-  if (!(body.reason in REASONS)) throw new ApiError(400, "Bitte einen Grund auswählen.");
+  if (typeof body.reason !== "string" || !Object.hasOwn(REASONS, body.reason)) throw new ApiError(400, "Bitte einen Grund auswählen.");
   const comment = cleanComment(body.comment);
 
   const task = await env.DB.prepare(
@@ -50,7 +50,7 @@ export async function reportTask(request, env, { id }) {
        FROM tasks t LEFT JOIN members ub ON ub.id = t.updated_by
       WHERE t.id = ? AND t.class_id = ? AND t.owner_member_id IS NULL AND t.deleted_at IS NULL`
   ).bind(id, classInfo.id).first();
-  if (!task) throw new ApiError(404, "Diese Aufgabe gibt es nicht (mehr).");
+  if (!task) throw new ApiError(404, "Diese Aufgabe gibt es nicht mehr.");
 
   const now = Date.now();
   const dup = await env.DB.prepare(

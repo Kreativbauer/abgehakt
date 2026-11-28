@@ -10,6 +10,7 @@
 // Warteschlange push_outbox; verschickt wird alle
 // 5 Minuten in kleinen Paketen (src/jobs/notify.js) – der kostenlose Cloudflare-Tarif erlaubt pro Lauf
 // nur wenig Rechenzeit und höchstens 50 ausgehende Anfragen.
+import { KIND_LABELS } from "./tasks.js";
 import { ApiError, json, readJson } from "../lib/http.js";
 import { requireMember } from "../lib/auth.js";
 import { newId } from "../lib/crypto.js";
@@ -19,12 +20,6 @@ import { isAllowedEndpoint, pushConfigured, sendPush, unb64url } from "../lib/we
 const MAX_SUBSCRIPTIONS_PER_MEMBER = 5;
 const MAX_RECIPIENTS = 200;
 
-const KIND_LABELS = {
-  exam: "Schulaufgabe",
-  short_exam: "Kurzarbeit",
-  test: "Test / Abfrage",
-  presentation: "Referat / Abgabe",
-};
 const DATE_SHORT = new Intl.DateTimeFormat("de-DE", { weekday: "short", day: "numeric", month: "numeric", timeZone: "UTC" });
 
 export function formatDay(date) {

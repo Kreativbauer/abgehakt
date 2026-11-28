@@ -12,19 +12,18 @@
 import { ApiError, json, readJson } from "../lib/http.js";
 import { newId, newJoinCode } from "../lib/crypto.js";
 import { requireAdmin, requireMember } from "../lib/auth.js";
-import { cleanName } from "./join.js";
+import { cleanName, MAX_MEMBERS } from "./join.js";
 import { removeMemberStmts } from "../lib/purge.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PERSONAL_CODE_DAYS = 7;
 const ROLES = new Set(["admin", "editor", "member"]);
-const MAX_MEMBERS = 200;
 
 async function loadMember(env, classId, memberId) {
   const row = await env.DB.prepare(
     "SELECT id, name, role FROM members WHERE id = ? AND class_id = ? AND removed_at IS NULL"
   ).bind(memberId, classId).first();
-  if (!row) throw new ApiError(404, "Diese Person gibt es in der Klasse nicht (mehr).");
+  if (!row) throw new ApiError(404, "Diese Person gibt es in der Klasse nicht mehr.");
   return row;
 }
 
@@ -136,7 +135,7 @@ export async function updateMember(request, env, { id }) {
   if ("role" in body && body.role !== target.role) {
     if (!ROLES.has(body.role)) throw new ApiError(400, "Ungültige Rolle.");
     if (target.role === "admin" && (await adminCount(env, classInfo.id)) <= 1) {
-      throw new ApiError(409, "Die Klasse braucht mindestens einen Admin. Ernenne erst jemand anderen.");
+      throw new ApiError(409, "Die Klasse braucht mindestens einen Admin. Ernenne erst eine andere Person zum Admin.");
     }
     // Neue Rolle → Fach-Liste zurücksetzen (wer wieder Eintragende*r wird, darf zunächst alle Fächer).
     await env.DB.prepare("UPDATE members SET role = ?, editor_subject_ids = '[]' WHERE id = ? AND removed_at IS NULL").bind(body.role, id).run();
@@ -229,7 +228,7 @@ export async function updateSettings(request, env) {
 export async function leaveClass(request, env) {
   const { member, classInfo } = await requireMember(request, env);
   if (member.role === "admin" && (await adminCount(env, classInfo.id)) <= 1) {
-    throw new ApiError(409, "Du bist der einzige Admin. Ernenne erst jemand anderen zum Admin, bevor du austrittst.");
+    throw new ApiError(409, "Du bist die einzige Person mit Admin-Rechten. Ernenne erst eine andere Person zum Admin, bevor du austrittst.");
   }
   await env.DB.batch(removeMemberStmts(env, member.id, Date.now()));
   return json({ ok: true });

@@ -1,6 +1,6 @@
 {
   "name": "abgehakt",
-  "version": "0.36.3",
+  "version": "0.36.4",
   "license": "AGPL-3.0-only",
   "private": true,
   "description": "Abgehakt – das kostenlose Klassen-Hausaufgabenheft (Cloudflare Workers + D1)",

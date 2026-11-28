@@ -3,8 +3,10 @@
 //   POST /api/join        { code, name }    → tritt bei, liefert den Geräte-Schlüssel
 import { ApiError, json, readJson } from "../lib/http.js";
 import { newDeviceToken, newId, normalizeCode, sha256Hex } from "../lib/crypto.js";
+import { replaceDevicesStmts } from "../lib/purge.js";
 
 const NAME_MAX = 40;
+export const MAX_MEMBERS = 200;
 
 /** Name säubern: Leerzeichen zusammenfassen, keine Steuerzeichen, 1–40 Zeichen. */
 export function cleanName(input) {
@@ -21,7 +23,7 @@ async function findValidCode(env, rawCode, now) {
   if (code.length !== 8) throw new ApiError(400, "Ein Code hat 8 Zeichen, z. B. K7MP-4XQ2.", "invalid_code");
 
   const row = await env.DB.prepare(
-    `SELECT jc.code, jc.kind, jc.class_id, jc.member_id, jc.expires_at, jc.max_uses, jc.use_count,
+    `SELECT jc.code, jc.kind, jc.class_id, jc.member_id, jc.created_by, jc.expires_at, jc.max_uses, jc.use_count,
             jc.revoked_at, c.name AS class_name, m.name AS member_name, m.removed_at AS member_removed_at
        FROM join_codes jc
        JOIN classes c ON c.id = jc.class_id
@@ -70,6 +72,10 @@ export async function join(request, env) {
     memberId = newId();
     memberName = cleanName(body.name);
     role = "member";
+    const count = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM members WHERE class_id = ? AND removed_at IS NULL"
+    ).bind(row.class_id).first();
+    if (count.n >= MAX_MEMBERS) throw new ApiError(429, `Eine Klasse kann höchstens ${MAX_MEMBERS} Personen haben.`, "class_full");
     const taken = await env.DB.prepare(
       "SELECT 1 FROM members WHERE class_id = ? AND removed_at IS NULL AND lower(name) = lower(?)"
     ).bind(row.class_id, memberName).first();
@@ -97,6 +103,11 @@ export async function join(request, env) {
        SELECT ?, ?, ?, 'member', ?, ? WHERE changes() = 1`
     ).bind(memberId, row.class_id, memberName, now, now));
   }
+  // Code, den ein Admin für eine ANDERE Person erzeugt hat = Gerätewechsel: Die bisherigen Geräte dieser Person werden
+  // abgemeldet (sie merkt es sofort). So kann niemand mit einem fremden Code still mitlesen (private Aufgaben, Notizen).
+  // Selbst erzeugte Codes („Weiteres Gerät anmelden“) lassen die alten Geräte angemeldet.
+  const switchesDevice = row.kind === "personal" && row.created_by !== row.member_id;
+  const deviceIndex = stmts.length;
   stmts.push(
     env.DB.prepare(
       `INSERT INTO devices (token_hash, member_id, created_at, last_seen_at)
@@ -107,8 +118,11 @@ export async function join(request, env) {
     env.DB.prepare("UPDATE members SET age_confirmed_at = COALESCE(age_confirmed_at, ?) WHERE id = ?").bind(now, memberId),
   );
 
+  // Erst nach dem neuen Gerät – und nur, wenn es wirklich angelegt wurde (sonst bliebe die Person ganz ohne Gerät).
+  if (switchesDevice) stmts.push(...replaceDevicesStmts(env, memberId, tokenHash, now));
+
   const results = await env.DB.batch(stmts);
-  if (results[0].meta.changes !== 1 || results[stmts.length - 3].meta.changes !== 1) {
+  if (results[0].meta.changes !== 1 || results[deviceIndex].meta.changes !== 1) {
     throw new ApiError(409, "Das hat gerade nicht geklappt. Bitte noch einmal versuchen.", "conflict");
   }
 

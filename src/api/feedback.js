@@ -22,23 +22,27 @@ function platformOf(request) {
 export async function sendFeedback(request, env) {
   const { member } = await requireMember(request, env);
   const body = await readJson(request);
-  if (!(body.kind in KINDS)) throw new ApiError(400, "Bitte auswählen, worum es geht.");
+  if (typeof body.kind !== "string" || !Object.hasOwn(KINDS, body.kind)) throw new ApiError(400, "Bitte auswählen, worum es geht.");
   const text = typeof body.text === "string" ? body.text.normalize("NFC").replace(/\r\n?/g, "\n").trim() : "";
   if ([...text].length < 5) throw new ApiError(400, "Bitte beschreibe kurz deine Idee oder den Fehler.");
   if ([...text].length > 2000) throw new ApiError(400, "Bitte höchstens 2000 Zeichen.");
 
-  // Nur zum Begrenzen: Hash statt Person – der Betreiber sieht nicht, wer geschrieben hat.
+  // Begrenzung getrennt von der Nachricht: In feedback_limits steht nur ein Hash und die Uhrzeit, der tägliche Lauf
+  // löscht ihn nach 24 Stunden. An der Nachricht selbst wird nichts gespeichert, das auf die Person zeigt.
   const senderHash = await sha256Hex(`feedback:${member.id}`);
   const now = Date.now();
   const recent = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM feedback WHERE sender_hash = ? AND created_at > ?"
+    "SELECT COUNT(*) AS n FROM feedback_limits WHERE sender_hash = ? AND created_at > ?"
   ).bind(senderHash, now - 24 * 60 * 60 * 1000).first();
   if (recent.n >= MAX_PER_DAY) throw new ApiError(429, "Danke für deinen Eifer! Heute geht nichts mehr – morgen wieder.");
 
-  await env.DB.prepare(
-    `INSERT INTO feedback (id, kind, text, app_version, platform, sender_hash, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(newId(), body.kind, text, pkg.version, platformOf(request), senderHash, now).run();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO feedback_limits (sender_hash, created_at) VALUES (?, ?)").bind(senderHash, now),
+    env.DB.prepare(
+      `INSERT INTO feedback (id, kind, text, app_version, platform, sender_hash, created_at)
+       VALUES (?, ?, ?, ?, ?, '', ?)`
+    ).bind(newId(), body.kind, text, pkg.version, platformOf(request), now),
+  ]);
   const preview = text.length > 120 ? `${text.slice(0, 117).trimEnd()} …` : text;
   await enqueueOperator(env, "feedback", `${KINDS[body.kind]}: ${preview}`);
   return json({ ok: true }, 201);

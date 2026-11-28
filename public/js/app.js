@@ -7,9 +7,10 @@ const ACTIVE_KEY = "abgehakt.active";     // classId der gerade gezeigten Klasse
 const CACHE_PREFIX = "abgehakt.cache.";   // zuletzt geladene Aufgaben pro Klasse (für schnellen Start)
 const ACCOUNT_KEY = "abgehakt.account";   // { token, email } – nur für Admins
 const QUEUE_PREFIX = "abgehakt.queue.";   // offline gemachte Änderungen pro Klasse, werden nachgeschickt
+const INSTALL_CODE_PREFIX = "abgehakt.installCode."; // Code für die Home-Bildschirm-App (nicht bei jedem Neuladen neu)
 const INSTALL_KEY = "abgehakt.installHint"; // Zeitpunkt, bis zu dem der Installations-Hinweis ausgeblendet ist
 
-const ROLE_LABELS = { admin: "Admin", editor: "Eintragende*r", member: "Mitglied" };
+const ROLE_LABELS = { admin: "Admin", editor: "Eintragende", member: "Mitglied" };
 
 const $ = (id) => document.getElementById(id);
 
@@ -255,6 +256,7 @@ function findLinks(...texts) {
  */
 function withoutLinks(text) {
   return String(text || "")
+    .replace(/:([ \t]*)(?=https?:\/\/)/gi, "$1")   // „bearbeiten: https://…“ → kein Doppelpunkt ohne Adresse dahinter
     // Adresse entfernen, Satzzeichen dahinter behalten (wie in findLinks() abgeschnitten)
     .replace(URL_PATTERN, (m) => (m.match(/[.,;:!?)\]}'"\u2019\u201c\u201d]+$/) || [""])[0])
     .replace(/\(\s*\)|\[\s*\]|<\s*>/g, "")   // leer gewordene Klammern
@@ -479,12 +481,13 @@ const state = {
   mySubjects: [],        // gewählte Wahlfächer (IDs)
   electivesChosen: false,
   canManageSubjects: false,
-  subjectsDirty: false,
-  abRef: null,           // A/B-Wochen: Montag einer A-Woche, sonst null  // Fächer geändert → beim Zurück ins Heft neu laden
+  subjectsDirty: false,  // Fächer geändert → beim Zurück ins Heft neu laden
+  abRef: null,           // A/B-Wochen: Montag einer A-Woche, sonst null
   membership: null,      // Eintrag aus loadMemberships()
   tasks: [],
   canPostForClass: false,
   day: defaultDay(),
+  homeDay: null,         // Start-Tag beim letzten Öffnen (heute bzw. Montag) – für den Tageswechsel über Nacht
   expanded: new Set(),   // aufgeklappte Aufgaben (IDs)
   editingId: null,       // null = neue Aufgabe
   offline: false,
@@ -792,7 +795,7 @@ const THEMES = [
   ["blau", "Blau", "#3b82f6"],
   ["lila", "Lila", "#9b5de5"],
 ];
-const THEME_VARS = ["--bg", "--surface", "--surface-hover", "--border", "--accent", "--accent-soft", "--accent-hover", "--on-accent", "--shot-shadow"];
+const THEME_VARS = ["--bg", "--surface", "--surface-hover", "--border", "--accent", "--accent-soft", "--accent-hover", "--link", "--on-accent", "--shot-shadow"];
 const darkScheme = window.matchMedia("(prefers-color-scheme: dark)");
 
 function readTheme() {
@@ -837,6 +840,12 @@ function themeVars(hex, dark) {
   // Schrift auf farbigen Knöpfen: weiß – bei hellen Akzentfarben (z. B. Gelb, Türkis im Dunkeln) dunkel, damit lesbar.
   const lum = luminance(h, s, accentL);
   vars["--on-accent"] = 1.05 / (lum + 0.05) >= 3.3 ? "#fff" : "#111"; // weiß, solange gut lesbar (Kontrast ≥ 3,3)
+  // Links: Kontrast zum Hintergrund mindestens 4,6 (WCAG AA) – im Dunkeln heller, im Hellen dunkler als die Akzentfarbe.
+  const bgLum = dark ? luminance(h, tint * 0.45, 4.5) : luminance(h, tint * 1.6, 98.6);
+  let linkL = accentL;
+  const contrast = (l) => { const x = luminance(h, s, l); return (Math.max(x, bgLum) + 0.05) / (Math.min(x, bgLum) + 0.05); };
+  while (contrast(linkL) < 4.6 && linkL > 5 && linkL < 95) linkL += dark ? 2 : -2;
+  vars["--link"] = hsl(h, s, linkL);
   return vars;
 }
 
@@ -1008,6 +1017,7 @@ function renderDay() {
   const day = state.day;
   const t = today();
   $("day-relative").textContent = relativeDay(day);
+  $("day-label").setAttribute("aria-label", `Zurück zu heute (angezeigt: ${relativeDay(day) ? `${relativeDay(day)}, ` : ""}${DATE_LONG.format(fromDateStr(day))})`);
   const week = weekType(day);
   $("day-date").textContent = DATE_LONG.format(fromDateStr(day)) + (week ? ` · ${week.toUpperCase()}-Woche` : "");
 
@@ -1354,7 +1364,7 @@ function laterInSeries(task) {
 }
 
 async function deleteTask(task, { following = false } = {}) {
-  const what = task.private ? "Diese private Aufgabe" : "Diese Aufgabe wird für die ganze Klasse";
+  const what = task.private ? "Diese private Aufgabe" : "Diese Aufgabe für die ganze Klasse";
   const question = following
     ? `„${taskLabel(task)}“ am ${DATE_SHORT.format(fromDateStr(task.dueDate))} und alle späteren dieser Reihe (${laterInSeries(task).length + 1} Einträge) ${task.private ? "" : "für die ganze Klasse "}löschen?`
     : `${what} löschen?\n\n„${taskLabel(task)}“`;
@@ -1532,6 +1542,7 @@ function updateKindFields() {
   const homework = kind === "homework";
   const other = kind === "other"; // sonstiger Termin: eigener Text, z. B. Klassenfoto
   $("label-due").textContent = homework ? "Abgabe am" : "Termin am";
+  $("task-form-title").textContent = `${homework ? "Aufgabe" : "Termin"} ${state.editingId ? "bearbeiten" : "eintragen"}`;
   $("title-fields").hidden = !homework && !other;
   $("label-title").textContent = other ? "Was ist es?" : "Was ist zu tun?";
   $("input-title").placeholder = other ? "z. B. Klassenfoto, Wandertag, Elternabend" : "z. B. S. 42 Nr. 3 und 4";
@@ -1561,7 +1572,7 @@ function suggestDue() {
  * Doppelte Einträge: Gibt es schon einen sichtbaren Eintrag derselben Art im selben Fach mit demselben Datum?
  * Nur ein Hinweis – wer trotzdem speichern will, tippt ein zweites Mal.
  */
-function findDuplicates(body, subjectId) {
+function findDuplicates(body, subjectId, isPrivate) {
   const subject = subjectId ? subjectById(subjectId) : null;
   const sameSubject = (t) => (subjectId
     ? t.subjectId === subjectId || (!t.subjectId && subject && t.subject === subject.name) // ältere Einträge: über den Namen
@@ -1569,6 +1580,7 @@ function findDuplicates(body, subjectId) {
   // Sonstige Termine: nur gleich, wenn auch der Text gleich ist (Klassenfoto ≠ Wandertag).
   const sameText = (t) => body.kind !== "other" || t.title.trim().toLowerCase() === body.title.trim().toLowerCase();
   return state.tasks.filter((t) => t.dueDate === body.dueDate
+    && Boolean(t.private) === Boolean(isPrivate) // private Aufgaben sind kein Duplikat eines Klassen-Eintrags
     && (t.kind || "homework") === body.kind
     && sameSubject(t)
     && sameText(t)
@@ -1587,7 +1599,6 @@ function openTaskForm(task = null) {
   state.editingId = task ? task.id : null;
   $("input-private").checked = false; // vor fillSubjectSelect(): Klassen-Eintrag ist der Standard
   resetDuplicateHint();
-  $("task-form-title").textContent = task ? "Aufgabe bearbeiten" : "Aufgabe eintragen";
   $("input-kind").value = task && task.kind ? task.kind : "homework";
   fillSubjectSelect(task);
   $("input-title").value = task ? task.title : "";
@@ -1636,8 +1647,9 @@ async function onTaskSubmit(event) {
   }
   // Nur beim Eintragen: Gibt es das schon? Dann einmal nachfragen.
   if (!state.editingId && choice !== "__new__") {
-    const signature = JSON.stringify([body.kind, choice, body.dueDate, body.kind === "other" ? body.title.trim() : ""]);
-    const dups = findDuplicates(body, choice === "__keep__" ? null : choice || null);
+    const isPrivate = !state.canPostForClass || $("input-private").checked;
+    const signature = JSON.stringify([body.kind, choice, body.dueDate, body.kind === "other" ? body.title.trim() : "", isPrivate]);
+    const dups = findDuplicates(body, choice === "__keep__" ? null : choice || null, isPrivate);
     if (dups.length && dupConfirmedFor !== signature) {
       dupConfirmedFor = signature;
       $("dup-list").replaceChildren(...dups.slice(0, 3).map((t) => el("li", {},
@@ -1804,7 +1816,10 @@ function handleAuthError(err) {
   const m = state.membership;
   const rest = loadMemberships().filter((x) => x.classId !== m.classId);
   saveMemberships(rest);
-  try { localStorage.removeItem(CACHE_PREFIX + m.classId); } catch { /* egal */ }
+  // Auch Warteschlange (kann private Notizen enthalten) und „Alle Fächer zeigen“ dieser Klasse vom Gerät nehmen.
+  for (const key of [CACHE_PREFIX + m.classId, QUEUE_PREFIX + m.classId, `abgehakt.showAll.${m.classId}`, INSTALL_CODE_PREFIX + m.classId]) {
+    try { localStorage.removeItem(key); } catch { /* egal */ }
+  }
   state.membership = null;
   showNotice(`${err.message} („${m.className}“)`);
   if (rest.length) openClass(rest[0].classId, { keepNotice: true });
@@ -1820,10 +1835,15 @@ async function openClass(classId, { keepNotice = false } = {}) {
   if (!m) return startJoin();
   if (!keepNotice) showNotice("");
 
+  const home = defaultDay();
   if (!state.membership || state.membership.classId !== m.classId) {
-    state.day = defaultDay();
+    state.day = home;
     state.expanded.clear();
+  } else if (state.day === state.homeDay && home !== state.homeDay) {
+    // Über Nacht offen gelassen: Wer nicht selbst geblättert hat, landet auf dem neuen Start-Tag (sonst „Gestern“).
+    state.day = home;
   }
+  state.homeDay = home;
   state.membership = m;
   setActiveId(m.classId);
   renderSwitcher(list, m.classId);
@@ -2054,8 +2074,7 @@ async function onLoginCodeSubmit(event) {
     saveAccount(account);
     // Admin-Rollen, die schon auf diesem Gerät sind, mit dem Konto verknüpfen
     // (damit sie nach einem Gerätewechsel per E-Mail-Code wiederkommen).
-    await Promise.all(loadMemberships().filter((m) => m.role === "admin").map((m) =>
-      api("/api/account/link", { method: "POST", body: { memberToken: m.token }, token: account.token }).catch(() => {})));
+    const linked = await linkAdminRoles(account);
     if (loginIntent === "login") {
       if (res.memberships.length) {
         mergeMemberships(res.memberships);
@@ -2075,7 +2094,7 @@ async function onLoginCodeSubmit(event) {
     if (loginIntent === "secure") {
       if (res.memberships.length) mergeMemberships(res.memberships);
       await openClass(state.membership ? state.membership.classId : getActiveId(), { keepNotice: true });
-      showNotice("Abgesichert: Deine Admin-Rechte sind jetzt mit deiner E-Mail verknüpft.");
+      showLinkResult(linked);
       return;
     }
     openCreateClass(account);
@@ -2398,6 +2417,8 @@ async function changeRole(m, select) {
   try {
     await api(`/api/members/${m.id}`, { method: "PATCH", body: { role }, token: state.membership.token });
     m.role = role;
+    // Neu geladen, damit bei Eintragenden gleich ihre Wahlfächer da sind („Fächer“ zeigt nur Fächer, die sie haben).
+    if (!(await loadMembers())) return;
     renderMembers();
   } catch (err) {
     if (handleAuthError(err)) return;
@@ -2421,11 +2442,12 @@ async function renameOther(m) {
 }
 
 async function personalCode(m) {
-  if (m.joined && !window.confirm(`Neuen persönlichen Code für ${m.name} erzeugen? Damit kann sich ${m.name} auf einem neuen Gerät wieder anmelden.`)) return;
+  if (m.joined && !window.confirm(`Neuen persönlichen Code für ${m.name} erzeugen? Damit kann sich ${m.name} auf einem neuen Gerät wieder anmelden – die bisherigen Geräte werden dabei abgemeldet.`)) return;
   showError("error-members", "");
   try {
     const res = await api(`/api/members/${m.id}/code`, { method: "POST", token: state.membership.token });
-    $("personal-code-box").replaceChildren(renderCodeCard(`Persönlicher Code für ${m.name}`, res.code.code, res.code.expiresAt, "nur einmal nutzbar"));
+    $("personal-code-box").replaceChildren(renderCodeCard(`Persönlicher Code für ${m.name}`, res.code.code, res.code.expiresAt,
+      m.joined ? "nur einmal nutzbar · meldet die bisherigen Geräte ab" : "nur einmal nutzbar"));
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (err) {
     if (handleAuthError(err)) return;
@@ -2468,13 +2490,40 @@ async function onAddMemberSubmit(event) {
   }
 }
 
+/**
+ * Admin-Rollen auf diesem Gerät mit dem Konto verknüpfen (damit sie nach einem Gerätewechsel per E-Mail-Code
+ * wiederkommen). Ergebnis pro Klasse: true = verknüpft, false = nicht möglich (z. B. schon mit einer anderen
+ * E-Mail verknüpft), null = Fehler (offline …).
+ */
+async function linkAdminRoles(account) {
+  const result = new Map();
+  await Promise.all(loadMemberships().filter((m) => m.role === "admin").map(async (m) => {
+    try {
+      const res = await api("/api/account/link", { method: "POST", body: { memberToken: m.token }, token: account.token });
+      result.set(m.classId, Boolean(res.linked));
+    } catch {
+      result.set(m.classId, null);
+    }
+  }));
+  return result;
+}
+
+/** Meldung nach „Mit E-Mail absichern“ – nur „abgesichert“, wenn es für diese Klasse wirklich geklappt hat. */
+function showLinkResult(linked) {
+  const ok = state.membership ? linked.get(state.membership.classId) : null;
+  if (ok === true) showNotice("Abgesichert: Deine Admin-Rechte sind jetzt mit deiner E-Mail verknüpft.");
+  else if (ok === false) showNotice("Das hat nicht geklappt: Deine Admin-Rolle in dieser Klasse ist schon mit einer anderen E-Mail-Adresse verknüpft.");
+  else showNotice("Das Absichern hat gerade nicht geklappt. Bitte mit Internet noch einmal versuchen.");
+}
+
 function startSecure() {
   const account = loadAccount();
   if (account) {
     // Schon angemeldet: direkt verknüpfen.
-    Promise.all(loadMemberships().filter((m) => m.role === "admin").map((m) =>
-      api("/api/account/link", { method: "POST", body: { memberToken: m.token }, token: account.token }).catch(() => {})))
-      .then(openMembers);
+    linkAdminRoles(account).then(async (linked) => {
+      await openMembers();
+      showLinkResult(linked);
+    });
     return;
   }
   showLogin("secure");
@@ -2549,7 +2598,8 @@ async function downloadMyData() {
 
 function markSettingsTab(active) {
   for (const tab of document.querySelectorAll(".settings-tabs button")) {
-    tab.setAttribute("aria-selected", String(tab.dataset.tab === active));
+    if (tab.dataset.tab === active) tab.setAttribute("aria-current", "page");
+    else tab.removeAttribute("aria-current");
   }
 }
 
@@ -2707,7 +2757,6 @@ async function deleteOwnClass() {
   showError("error-delete-class", "");
   try {
     await api("/api/class/delete", { method: "POST", body: { confirmName: typed }, token: m.token });
-    try { localStorage.removeItem(QUEUE_PREFIX + m.classId); } catch { /* egal */ }
     handleAuthError({ status: 401, message: "Die Klasse wurde gelöscht." });
   } catch (err) {
     if (handleAuthError(err)) return;
@@ -3039,7 +3088,7 @@ async function enablePush({ fromHint = false } = {}) {
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
     renderPushCard();
-    if (fromHint) showNotice("Ohne deine Erlaubnis kann Abgehakt keine Benachrichtigungen schicken. Du kannst sie später unter Einstellungen einschalten.");
+    if (fromHint) showNotice("Ohne deine Erlaubnis kann Abgehakt keine Benachrichtigungen schicken. Du kannst sie später unter „Einstellungen → Für mich → Benachrichtigungen“ einschalten.");
     return;
   }
   try {
@@ -3059,7 +3108,7 @@ async function enablePush({ fromHint = false } = {}) {
     push.endpoint = j.endpoint;
     push.keys = j.keys;
     push.settings = res.subscription;
-    if (fromHint) showNotice("Erinnerungen sind an. Uhrzeit und Arten stellst du unter Einstellungen → Benachrichtigungen ein.");
+    if (fromHint) showNotice("Erinnerungen sind an. Uhrzeit und Arten stellst du unter „Einstellungen → Für mich → Benachrichtigungen“ ein.");
   } catch (err) {
     if (handleAuthError(err)) return;
     const message = err.offline ? "Einschalten geht nur mit Internet." : err.message || "Das hat gerade nicht geklappt.";
@@ -3417,30 +3466,49 @@ function renderInstallHint() {
   renderPushHint();
 }
 
-let installCode = null; // einmal erzeugter Code für die Home-Bildschirm-App (pro Klasse)
+let installCode = null; // einmal erzeugter Code für die Home-Bildschirm-App (pro Klasse, auch über Neuladen gemerkt)
 
-async function renderInstallCode() {
+/** Ist der gemerkte Code noch einlösbar? (Schon in der installierten App benutzt → nein.) Offline: im Zweifel ja. */
+async function installCodeStillValid(code) {
+  try {
+    await api("/api/code/check", { method: "POST", body: { code: code.code } });
+    return true;
+  } catch (err) {
+    return !(err.status >= 400 && err.status < 500 && err.status !== 429);
+  }
+}
+
+async function renderInstallCode({ fresh = false } = {}) {
   const box = $("install-code-box");
   box.replaceChildren();
   showError("error-install", "");
   const m = state.membership;
   try {
-    if (!installCode || installCode.classId !== m.classId || installCode.expiresAt < Date.now()) {
+    if (!installCode || installCode.classId !== m.classId) installCode = readJsonStorage(INSTALL_CODE_PREFIX + m.classId, null);
+    // Ein neuer Code macht ältere ungültig – deshalb nur, wenn keiner da ist, er bald abläuft, schon eingelöst wurde
+    // oder ausdrücklich ein neuer gewünscht ist.
+    const usable = installCode && installCode.classId === m.classId && installCode.expiresAt > Date.now() + 60 * 60 * 1000;
+    if (fresh || !usable || !(await installCodeStillValid(installCode))) {
       const res = await api("/api/me/code", { method: "POST", token: m.token });
       installCode = { classId: m.classId, ...res.code };
+      writeJsonStorage(INSTALL_CODE_PREFIX + m.classId, installCode);
     }
     const pretty = `${installCode.code.slice(0, 4)}-${installCode.code.slice(4)}`;
     const copy = el("button", { class: "button button-small", type: "button", text: "Code kopieren" });
     copy.addEventListener("click", () => copyText(pretty, copy));
+    const renew = el("button", { class: "button button-small", type: "button", text: "Neuen Code erzeugen" });
+    renew.addEventListener("click", () => {
+      if (window.confirm("Neuen Code erzeugen? Der bisherige Code gilt dann nicht mehr.")) renderInstallCode({ fresh: true });
+    });
     box.append(el("div", { class: "invite card personal-code" },
       el("p", { class: "eyebrow", text: `Dein Code für die App · ${m.className}` }),
       el("p", { class: "invite-code", text: pretty }),
       el("p", { class: "hint", text: `Nur für dich, einmal nutzbar, gültig bis ${DATE_ONLY.format(new Date(installCode.expiresAt))}. Am besten jetzt kopieren oder merken.` }),
-      el("div", { class: "invite-actions" }, copy, ...(installsViaChrome() ? [chromeLink(installCode.code)] : [])),
+      el("div", { class: "invite-actions" }, copy, ...(installsViaChrome() ? [chromeLink(installCode.code)] : []), renew),
     ));
   } catch (err) {
     if (handleAuthError(err)) return;
-    showError("error-install", "Der Code konnte gerade nicht erzeugt werden. Du findest ihn später unter „Einstellungen → Weiteres Gerät anmelden“.");
+    showError("error-install", "Der Code konnte gerade nicht erzeugt werden. Du kannst ihn später unter „Einstellungen → Für mich → Weiteres Gerät anmelden“ erzeugen.");
     if (installsViaChrome()) box.append(el("div", { class: "invite-actions" }, chromeLink()));
   }
 }

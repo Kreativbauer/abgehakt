@@ -150,7 +150,7 @@ async function resolveSubject(env, classId, body, fallback = { subject: "", subj
     const row = await env.DB.prepare(
       "SELECT id, name FROM subjects WHERE id = ? AND class_id = ? AND archived_at IS NULL"
     ).bind(body.subjectId, classId).first();
-    if (!row) throw new ApiError(400, "Dieses Fach gibt es nicht (mehr). Bitte ein anderes wählen.");
+    if (!row) throw new ApiError(400, "Dieses Fach gibt es nicht mehr. Bitte ein anderes wählen.");
     return { subject: row.name, subjectId: row.id };
   }
   if ("subject" in body) return { subject: cleanText(body.subject, "subject"), subjectId: null };
@@ -320,8 +320,8 @@ export async function updateTask(request, env, { id }) {
   const subj = await resolveSubject(env, classInfo.id, body, { subject: row.subject, subjectId: row.subject_id });
   const kind = "kind" in body ? cleanKind(body.kind) : kindOf(row);
   // Fach geändert? Dann muss auch das neue Fach zu den eigenen gehören (Eintragende mit Fach-Liste).
-  if (!row.owner_member_id && "subjectId" in body && !maySubject(member, subj.subjectId)) {
-    throw new ApiError(403, "Du darfst nur Einträge in deinen Fächern haben – dieses Fach gehört nicht dazu.");
+  if (!row.owner_member_id && ("subjectId" in body || "subject" in body) && !maySubject(member, subj.subjectId)) {
+    throw new ApiError(403, "Du darfst nur in deinen Fächern eintragen – dieses Fach gehört nicht dazu.");
   }
   const next = {
     subject: subj.subject,
@@ -424,7 +424,7 @@ export async function restoreTask(request, env, { id }) {
     `UPDATE tasks SET deleted_at = NULL, deleted_by = NULL
       WHERE id = ?3 AND id IN (SELECT t.id FROM tasks t WHERE ${RESTORABLE})`
   ).bind(classInfo.id, now - RESTORE_DAYS * 24 * 60 * 60 * 1000, id).run();
-  if (res.meta.changes !== 1) throw new ApiError(404, "Dieser Eintrag lässt sich nicht (mehr) wiederherstellen.");
+  if (res.meta.changes !== 1) throw new ApiError(404, "Dieser Eintrag lässt sich nicht mehr wiederherstellen.");
   await touchClass(env, classInfo.id, now);
   return json({ ok: true });
 }

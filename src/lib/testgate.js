@@ -36,8 +36,9 @@ export async function testGate(request, env, url) {
   if (password && cookieOf(request) === (await tokenFor(password))) return null;
 
   if (url.pathname.startsWith("/api/")) {
+    // 403 statt 401: Bei 401 würde die App die Klasse vom Gerät nehmen (handleAuthError).
     return new Response(JSON.stringify({ error: "Testversion: bitte zuerst das Passwort eingeben (Seite neu laden).", code: "test_locked" }), {
-      status: 401,
+      status: 403,
       headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
     });
   }
@@ -54,7 +55,7 @@ async function login(request, env, url) {
     return new Response("Nicht erlaubt.", { status: 403 });
   }
   try {
-    await rateLimit(env.CODE_LIMITER, request, "test-login");
+    await rateLimit(env.LOGIN_LIMITER, request, "test-login"); // 5 Versuche pro Minute und IP
   } catch {
     return page("Zu viele Versuche. Bitte eine Minute warten.", "/app/", 429);
   }

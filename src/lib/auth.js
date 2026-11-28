@@ -79,6 +79,9 @@ export async function requireMember(request, env) {
  * Admin-Konto über den Konto-Schlüssel (Authorization: Bearer <schlüssel>).
  * Liefert { account: { id, email }, tokenHash } oder wirft 401.
  */
+/** Admin-Anmeldungen (Konto-Schlüssel) gelten nach 90 Tagen ohne Nutzung nicht mehr (täglicher Lauf löscht sie). */
+export const ACCOUNT_SESSION_MAX_IDLE_MS = 90 * 24 * 60 * 60 * 1000;
+
 export async function requireAccount(request, env) {
   const header = request.headers.get("Authorization") || "";
   const match = header.match(/^Bearer ([A-Za-z0-9_-]{20,100})$/);
@@ -90,10 +93,10 @@ export async function requireAccount(request, env) {
        FROM account_sessions s JOIN accounts a ON a.id = s.account_id
       WHERE s.token_hash = ?`
   ).bind(tokenHash).first();
-  if (!row || row.revoked_at) {
+  const now = Date.now();
+  if (!row || row.revoked_at || now - row.last_seen_at > ACCOUNT_SESSION_MAX_IDLE_MS) {
     throw new ApiError(401, "Deine Admin-Anmeldung ist abgelaufen. Bitte neu anmelden.", "account_unauthenticated");
   }
-  const now = Date.now();
   if (now - row.last_seen_at > SEEN_INTERVAL_MS) {
     await env.DB.prepare("UPDATE account_sessions SET last_seen_at = ? WHERE token_hash = ?").bind(now, tokenHash).run();
   }

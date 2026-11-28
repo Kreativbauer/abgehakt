@@ -36,10 +36,11 @@ async function health(env) {
 }
 
 // Methode + Pfad → Funktion. :name = Platzhalter. limit = Schutz vor dem Durchprobieren von Codes.
+// limit = Bereich für das Rate-Limit pro IP (siehe unten).
 const ROUTES = [
   ["GET", "/api/health", (req, env) => health(env)],
-  ["POST", "/api/code/check", checkCode, "code"],
-  ["POST", "/api/join", join, "code"],
+  ["POST", "/api/code/check", checkCode, "code-check"],
+  ["POST", "/api/join", join, "join"],
   ["GET", "/api/me", me],
   ["GET", "/api/me/export", exportMyData],
   ["GET", "/api/tasks", listTasks],
@@ -49,8 +50,8 @@ const ROUTES = [
   ["PATCH", "/api/tasks/:id", updateTask],
   ["DELETE", "/api/tasks/:id", deleteTask],
   ["PUT", "/api/tasks/:id/state", setTaskState],
-  ["POST", "/api/account/start", startLogin, "code"],
-  ["POST", "/api/account/verify", verifyLogin, "code"],
+  ["POST", "/api/account/start", startLogin, "login-start"],
+  ["POST", "/api/account/verify", verifyLogin, "login"],
   ["POST", "/api/account/link", linkMember],
   ["POST", "/api/classes", createClass],
   ["GET", "/api/invites", listInvites],
@@ -58,10 +59,10 @@ const ROUTES = [
   ["POST", "/api/invites/:code/revoke", revokeInvite],
   ["PATCH", "/api/class", renameClass],
   ["POST", "/api/class/delete", deleteClass],
-  ["POST", "/api/operator/delete-class", operatorDeleteClass, "code"],
-  ["POST", "/api/operator/remove-member", operatorRemoveMember, "code"],
-  ["GET", "/api/operator/reports", operatorListReports, "code"],
-  ["POST", "/api/operator/reports/:id", operatorResolveReport, "code"],
+  ["POST", "/api/operator/delete-class", operatorDeleteClass, "operator"],
+  ["POST", "/api/operator/remove-member", operatorRemoveMember, "operator"],
+  ["GET", "/api/operator/reports", operatorListReports, "operator"],
+  ["POST", "/api/operator/reports/:id", operatorResolveReport, "operator"],
   ["POST", "/api/tasks/:id/report", reportTask],
   ["POST", "/api/feedback", sendFeedback],
   ["GET", "/api/subjects", listSubjects],
@@ -75,12 +76,12 @@ const ROUTES = [
   ["POST", "/api/push/subscription/status", subscriptionStatus],
   ["POST", "/api/push/subscription/delete", deleteSubscription],
   ["POST", "/api/push/test", testPush],
-  ["GET", "/api/operator/feedback", operatorListFeedback, "code"],
-  ["POST", "/api/operator/feedback/:id", operatorResolveFeedback, "code"],
-  ["POST", "/api/operator/push/status", operatorPushStatus, "code"],
-  ["PUT", "/api/operator/push", operatorPushSave, "code"],
-  ["POST", "/api/operator/push/delete", operatorPushDelete, "code"],
-  ["POST", "/api/operator/push/test", operatorPushTest, "code"],
+  ["GET", "/api/operator/feedback", operatorListFeedback, "operator"],
+  ["POST", "/api/operator/feedback/:id", operatorResolveFeedback, "operator"],
+  ["POST", "/api/operator/push/status", operatorPushStatus, "operator"],
+  ["PUT", "/api/operator/push", operatorPushSave, "operator"],
+  ["POST", "/api/operator/push/delete", operatorPushDelete, "operator"],
+  ["POST", "/api/operator/push/test", operatorPushTest, "operator"],
   ["GET", "/api/reports", listReports],
   ["POST", "/api/reports/:id", resolveReport],
   ["GET", "/api/members", listMembers],
@@ -107,7 +108,7 @@ function findRoute(method, pathname) {
     pathMatched = true;
     if (route.method === method) return { route, params: m.groups || {} };
   }
-  throw pathMatched ? new ApiError(405, "Methode nicht erlaubt.") : new ApiError(404, "Nicht gefunden");
+  throw pathMatched ? new ApiError(405, "Methode nicht erlaubt.") : new ApiError(404, "Nicht gefunden.");
 }
 
 export default {
@@ -138,7 +139,10 @@ export default {
         if (origin && origin !== url.origin) throw new ApiError(403, "Nicht erlaubt.");
       }
 
+      // Getrennte Zähler je Bereich (Beitreten, Anmelden, Betrieb …), damit eine Klasse, die im Schul-WLAN gemeinsam
+      // beitritt, nicht die anderen Bereiche sperrt. Anmelde-E-Mails zusätzlich strenger (LOGIN_LIMITER).
       if (route.limit) await rateLimit(env.CODE_LIMITER, request, route.limit);
+      if (route.limit === "login-start") await rateLimit(env.LOGIN_LIMITER, request, route.limit);
       return await route.handler(request, env, params);
     } catch (err) {
       return errorResponse(err);

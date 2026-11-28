@@ -10,8 +10,8 @@
   <meta name="robots" content="noindex, follow">
   <title>Datenschutzerklärung – Abgehakt</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/css/style.css?v=0.36.3">
-  <script src="/js/start.js?v=0.36.3" defer></script>
+  <link rel="stylesheet" href="/css/style.css?v=0.36.4">
+  <script src="/js/start.js?v=0.36.4" defer></script>
 </head>
 <body class="app">
   <header class="topbar">
@@ -48,10 +48,11 @@
 
     <h3>Wenn du einer Klasse beitrittst (alle Mitglieder)</h3>
     <ul>
-      <li><strong>Name</strong> in der Klasse (Spitznamen sind erlaubt) und deine <strong>Rolle</strong> (Mitglied, Eintragende*r, Admin) – bei Eintragenden auch, für welche Fächer sie eintragen dürfen</li>
+      <li><strong>Name</strong> in der Klasse (Spitznamen sind erlaubt) und deine <strong>Rolle</strong> (Mitglied, Eintragende, Admin) – bei Eintragenden auch, für welche Fächer sie eintragen dürfen</li>
       <li>Zeitpunkt des Beitritts und wann du bestätigt hast, mindestens 16 Jahre alt zu sein oder das Einverständnis deiner Eltern zu haben</li>
       <li>ein <strong>Geräte-Schlüssel</strong>, mit dem dein Gerät angemeldet bleibt. Auf dem Server speichern wir davon nur eine Prüfsumme, aus der sich der Schlüssel nicht zurückrechnen lässt.</li>
       <li>wann ein Gerät zuletzt genutzt wurde (höchstens stündlich aktualisiert) – damit erkennen wir, ob eine Klasse noch aktiv ist</li>
+      <li><strong>persönliche Codes</strong>, mit denen du ein weiteres oder neues Gerät anmeldest: einer Person zugeordnet, einmal nutzbar, 7 Tage gültig. Erzeugt ein Admin für dich einen Code, werden beim Einlösen deine bisherigen Geräte abgemeldet – so kann niemand unbemerkt mit deinem Namen angemeldet sein.</li>
       <li>dein <strong>Status</strong> zu Aufgaben (offen/erledigt), deine <strong>privaten Notizen</strong> und <strong>privaten Aufgaben</strong></li>
       <li>deine Einstellung, wer deinen Status sehen darf</li>
       <li>welche <strong>Wahlfächer</strong> du gewählt hast – nur, damit dir Hausaufgaben aus anderen Wahlfächern nicht angezeigt werden</li>
@@ -66,7 +67,7 @@
     <h3>Wenn du eine Idee oder einen Fehler meldest</h3>
     <ul>
       <li>deine Nachricht, die Art (Idee, Fehler, Sonstiges), Zeitpunkt, App-Version und die grobe Geräteart (iPhone/iPad, Android, Computer)</li>
-      <li>eine Prüfsumme, die nur verhindert, dass jemand mehr als 5 Nachrichten pro Tag schickt. Daraus lässt sich nicht ablesen, wer geschrieben hat oder aus welcher Klasse – die Nachricht ist anonym.</li>
+      <li>damit niemand mehr als 5 Nachrichten pro Tag schickt, merken wir uns <strong>getrennt von der Nachricht</strong> 24 Stunden lang eine Prüfsumme und die Uhrzeit; danach wird beides gelöscht. An der Nachricht selbst speichern wir nichts, das auf dich oder deine Klasse zeigt – die Nachricht ist anonym.</li>
     </ul>
     <p>Der Betreiber kann sich über neue Nachrichten benachrichtigen lassen. Dann geht der Anfang deiner Nachricht – Ende-zu-Ende verschlüsselt – über den Push-Dienst an sein Gerät (siehe „Push-Dienste“).</p>
 
@@ -75,6 +76,8 @@
       <li><strong>E-Mail-Adresse</strong> – für die Anmeldung per Code und für Hinweise zur eigenen Klasse (z. B. bevor eine inaktive Klasse gelöscht wird). Andere Mitglieder sehen die E-Mail-Adresse nicht.</li>
       <li>Anmeldecodes: Sie sind 10 Minuten gültig, werden nur als Prüfsumme gespeichert und nach einem Tag gelöscht.</li>
       <li>Zeitpunkt der letzten Anmeldung</li>
+      <li>zum Schutz vor Missbrauch: wenn ein Anmeldecode angefordert oder falsch eingegeben wird, <strong>24 Stunden lang eine Prüfsumme der IP-Adresse</strong> (bei IPv6 nur des gekürzten Netzbereichs) zusammen mit der eingegebenen E-Mail-Adresse. So lässt sich begrenzen, wie oft von einem Gerät bzw. Netz Codes angefordert und geraten werden. Danach wird beides gelöscht.</li>
+      <li>ein <strong>Schlüssel der Admin-Anmeldung</strong> pro Gerät (auf dem Server nur als Prüfsumme) mit dem Zeitpunkt der Anmeldung und der letzten Nutzung. Er verfällt nach 90 Tagen ohne Nutzung.</li>
     </ul>
 
     <h3>Wenn du Benachrichtigungen einschaltest (freiwillig)</h3>
@@ -108,7 +111,7 @@
       <li><strong>Alle in deiner Klasse</strong> sehen deinen Namen und deine Rolle sowie die Hausaufgaben der Klasse mit „zuletzt geändert von“.</li>
       <li><strong>Ob du etwas erledigt hast</strong>, sehen andere nur, wenn du das in den Einstellungen freigibst (Standard: niemand).</li>
       <li><strong>Private Aufgaben und Notizen</strong> siehst nur du – auch keine Admins.</li>
-      <li><strong>Deine Wahlfächer</strong> siehst nur du. Bist du Eintragende*r, sehen sie auch die Admins – damit sie dir nur Fächer zum Eintragen zuteilen können, die du selbst hast. Die Fächerliste der Klasse sehen alle; pflegen dürfen sie Admins und Eintragende.</li>
+      <li><strong>Deine Wahlfächer</strong> siehst nur du. Bist du Eintragende, sehen sie auch die Admins – damit sie dir nur Fächer zum Eintragen zuteilen können, die du selbst hast. Die Fächerliste der Klasse sehen alle; pflegen dürfen sie Admins und Eintragende.</li>
       <li><strong>Admins</strong> können Mitglieder einladen, umbenennen, entfernen und Rechte vergeben.</li>
       <li><strong>Gemeldete Einträge</strong> sehen die Admins der Klasse. Halten sie den Eintrag für in Ordnung oder reagieren sie nicht, sieht auch der Betreiber den gemeldeten Eintrag (nur diesen) und entscheidet: Eintrag ist in Ordnung, Eintrag ausblenden, Admins verwarnen oder – bei schweren Verstößen – die Klasse löschen.</li>
       <li><strong>Der Betreiber</strong> sieht sich die Inhalte der Klassen sonst nicht an.</li>
@@ -138,14 +141,15 @@
     <h2>7. Wie lange wir Daten speichern</h2>
     <ul>
       <li><strong>Klassen</strong> mit allen Inhalten speichern wir, solange sie genutzt werden. Nach <strong>12 Monaten ohne Aktivität</strong> wird eine Klasse gelöscht. Die Admins werden mindestens 30 Tage vorher per E-Mail gewarnt; wird die Klasse in dieser Zeit von irgendjemandem geöffnet, bleibt sie erhalten. Admins können ihre Klasse auch jederzeit selbst löschen.</li>
-      <li>Wer eine Klasse <strong>verlässt oder entfernt wird</strong>, verliert sofort den Zugang auf allen Geräten. Gleichzeitig werden <strong>Häkchen, private Notizen, private Aufgaben und die Wahlfach-Auswahl gelöscht</strong> und der Name durch „Ehemaliges Mitglied“ ersetzt. Hausaufgaben, die die Person für die Klasse eingetragen hat, bleiben für die Klasse erhalten.</li>
+      <li>Wer eine Klasse <strong>verlässt oder entfernt wird</strong>, verliert sofort den Zugang auf allen Geräten. Gleichzeitig werden <strong>Häkchen, private Notizen, private Aufgaben, die Wahlfach-Auswahl und die Fächer zum Eintragen gelöscht</strong> und der Name durch „Ehemaliges Mitglied“ ersetzt. Hausaufgaben, die die Person für die Klasse eingetragen hat, bleiben für die Klasse erhalten. Technische Einträge ohne Namen (Prüfsummen der abgemeldeten Geräte, ungültig gemachte Codes, Zeitpunkte von Beitritt und Altersbestätigung) bleiben bis zur Löschung der Klasse.</li>
       <li><strong>Benachrichtigungen:</strong> Empfangsadresse und Einstellungen löschen wir, sobald du sie ausschaltest, die Klasse verlässt oder der Push-Dienst meldet, dass die Adresse nicht mehr gilt. Noch nicht verschickte Benachrichtigungen werden nach dem Versand, spätestens nach einem Tag gelöscht.</li>
       <li><strong>Gelöschte Aufgaben</strong> werden sofort für alle ausgeblendet und mit der Klasse endgültig gelöscht. 30 Tage lang können Admins sie wiederherstellen (außer der Betreiber hat sie nach einer Meldung ausgeblendet).</li>
       <li>Wird eine <strong>Klasse gelöscht</strong> (durch ihre Admins, nach 12 Monaten ohne Aktivität oder nach einer Meldung rechtswidriger Inhalte), werden alle Daten der Klasse endgültig gelöscht: Hausaufgaben, Mitglieder, Häkchen, Notizen und Codes.</li>
       <li><strong>Admin-Konten</strong> (E-Mail-Adresse), die in keiner Klasse mehr Admin sind und sich 12 Monate nicht angemeldet haben, werden gelöscht.</li>
+      <li><strong>Admin-Anmeldungen</strong> (Schlüssel pro Gerät) werden nach 90 Tagen ohne Nutzung gelöscht; danach meldet man sich einfach neu per E-Mail-Code an.</li>
       <li><strong>Fehlerprotokolle</strong> beim Hoster werden nach wenigen Tagen automatisch gelöscht.</li>
       <li><strong>Meldungen</strong> werden 6 Monate nach ihrer Bearbeitung gelöscht, spätestens mit der Klasse.</li>
-      <li><strong>Ideen und Fehlermeldungen</strong> werden 6 Monate nach ihrer Bearbeitung gelöscht, spätestens nach 12 Monaten.</li>
+      <li><strong>Ideen und Fehlermeldungen</strong> werden 6 Monate nach ihrer Bearbeitung gelöscht, spätestens nach 12 Monaten. Die Prüfsumme zur Begrenzung wird nach 24 Stunden gelöscht; Nachrichten von vor Version 0.36.4 werden dabei ebenfalls anonymisiert.</li>
       <li><strong>Sicherungskopien:</strong> Gelöschte Daten können noch bis zu 90 Tage in den verschlüsselten Sicherungskopien enthalten sein; danach werden die Kopien automatisch gelöscht. Sie werden nur zur Wiederherstellung nach einem technischen Fehler verwendet.</li>
     </ul>
 
@@ -167,7 +171,7 @@
   </main>
 
   <footer class="footer">
-    <span class="status">Version 0.36.3</span>
+    <span class="status">Version 0.36.4</span>
   </footer>
 </body>
 </html>

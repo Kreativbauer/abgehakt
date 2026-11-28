@@ -12,7 +12,7 @@ export async function me(request, env) {
   return json({ class: classInfo, member });
 }
 
-const ROLES = { admin: "Admin", editor: "Eintragende Person", member: "Mitglied" };
+const ROLES = { admin: "Admin", editor: "Eintragende", member: "Mitglied" };
 const VISIBILITY = { none: "niemand", all: "alle in der Klasse", some: "ausgewählte Personen" };
 const REPORT_STATUS = {
   open: "offen", admin_hidden: "Eintrag von Admins entfernt", admin_dismissed: "von Admins als in Ordnung markiert",
@@ -33,7 +33,7 @@ export async function exportMyData(request, env) {
   const db = env.DB;
   const id = member.id;
 
-  const [m, devices, codes, states, own, created, reports, pushes] = await Promise.all([
+  const [m, devices, codes, states, own, created, reports, pushes, edited, deleted, madeCodes] = await Promise.all([
     db.prepare("SELECT * FROM members WHERE id = ?").bind(id).first(),
     db.prepare("SELECT created_at, last_seen_at, revoked_at FROM devices WHERE member_id = ? ORDER BY created_at").bind(id).all(),
     db.prepare(`SELECT created_at, expires_at, use_count, revoked_at FROM join_codes
@@ -49,10 +49,23 @@ export async function exportMyData(request, env) {
                   FROM reports WHERE reporter_member_id = ? ORDER BY created_at`).bind(id).all(),
     db.prepare(`SELECT endpoint, remind_hour, notify_reminder, notify_events, notify_new, notify_reports, created_at
                   FROM push_subscriptions WHERE member_id = ? ORDER BY created_at`).bind(id).all(),
+    // Klassen-Einträge anderer, die du zuletzt bearbeitet hast
+    db.prepare(`SELECT kind, other_event, title, subject, due_date, updated_at
+                  FROM tasks WHERE updated_by = ?1 AND created_by != ?1 AND owner_member_id IS NULL ORDER BY due_date`).bind(id).all(),
+    // Klassen-Einträge, die du gelöscht hast
+    db.prepare(`SELECT kind, other_event, title, subject, due_date, deleted_at
+                  FROM tasks WHERE deleted_by = ?1 AND owner_member_id IS NULL ORDER BY deleted_at`).bind(id).all(),
+    // Codes, die du erzeugt hast (Einladungen, persönliche Codes)
+    db.prepare(`SELECT kind, created_at, expires_at, use_count, revoked_at, member_id = ?1 AS self
+                  FROM join_codes WHERE created_by = ?1 ORDER BY created_at`).bind(id).all(),
   ]);
   const account = m.account_id
     ? await db.prepare("SELECT email, created_at, last_login_at FROM accounts WHERE id = ?").bind(m.account_id).first()
     : null;
+  const sessions = m.account_id
+    ? (await db.prepare("SELECT created_at, last_seen_at, revoked_at FROM account_sessions WHERE account_id = ? ORDER BY created_at")
+      .bind(m.account_id).all()).results
+    : [];
 
   // Namen statt interner Kennungen: für wen der Status freigegeben ist, welche Wahlfächer gewählt sind.
   const viewerIds = parseIds(m.status_viewers);
@@ -83,7 +96,10 @@ export async function exportMyData(request, env) {
       wahlfaecher: electives,
       wahlfaecherGewaehltAm: when(m.electives_chosen_at),
     },
-    adminKonto: account ? { email: account.email, angelegtAm: when(account.created_at), letzteAnmeldung: when(account.last_login_at) } : null,
+    adminKonto: account ? {
+      email: account.email, angelegtAm: when(account.created_at), letzteAnmeldung: when(account.last_login_at),
+      anmeldungen: sessions.map((s) => ({ angemeldetAm: when(s.created_at), zuletztGenutzt: when(s.last_seen_at), abgemeldetAm: when(s.revoked_at) })),
+    } : null,
     geraete: devices.results.map((d) => ({ angemeldetAm: when(d.created_at), zuletztGenutzt: when(d.last_seen_at), abgemeldetAm: when(d.revoked_at) })),
     persoenlicheCodes: codes.results.map((c) => ({ erstelltAm: when(c.created_at), gueltigBis: when(c.expires_at), genutzt: c.use_count > 0, ungueltigSeit: when(c.revoked_at) })),
     haekchenUndNotizen: states.results.map((s) => ({
@@ -94,6 +110,16 @@ export async function exportMyData(request, env) {
     })),
     vonDirEingetrageneKlassenEintraege: created.results.map((t) => ({
       eintrag: label(t), fach: t.subject, details: t.details, faellig: t.due_date, erstelltAm: when(t.created_at), geloeschtAm: when(t.deleted_at),
+    })),
+    vonDirBearbeiteteKlassenEintraege: edited.results.map((t) => ({
+      eintrag: label(t), fach: t.subject, faellig: t.due_date, geaendertAm: when(t.updated_at),
+    })),
+    vonDirGeloeschteKlassenEintraege: deleted.results.map((t) => ({
+      eintrag: label(t), fach: t.subject, faellig: t.due_date, geloeschtAm: when(t.deleted_at),
+    })),
+    vonDirErzeugteCodes: madeCodes.results.map((c) => ({
+      art: c.kind === "invite" ? "Einladung für die Klasse" : c.self ? "Persönlicher Code für dich" : "Persönlicher Code für eine andere Person",
+      erstelltAm: when(c.created_at), gueltigBis: when(c.expires_at), genutzt: c.use_count, ungueltigSeit: when(c.revoked_at),
     })),
     deineMeldungen: reports.results.map((r) => ({
       grund: REASONS[r.reason] || r.reason, begruendung: r.comment, eintrag: r.snapshot_title, fach: r.snapshot_subject,
