@@ -13,7 +13,7 @@ import { ApiError, json, readJson } from "../lib/http.js";
 import { newId, newJoinCode } from "../lib/crypto.js";
 import { requireAdmin, requireMember } from "../lib/auth.js";
 import { cleanName, MAX_MEMBERS } from "./join.js";
-import { removeMemberStmts } from "../lib/purge.js";
+import { deleteUnusedAccountStmts, removeMemberStmts } from "../lib/purge.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PERSONAL_CODE_DAYS = 7;
@@ -230,6 +230,15 @@ export async function leaveClass(request, env) {
   if (member.role === "admin" && (await adminCount(env, classInfo.id)) <= 1) {
     throw new ApiError(409, "Du bist die einzige Person mit Admin-Rechten. Ernenne erst eine andere Person zum Admin, bevor du austrittst.");
   }
+  // „Alle meine Daten löschen“: { deleteAccount: true } löscht danach auch das Admin-Konto (E-Mail, Anmeldungen,
+  // Anmeldecodes), wenn es in keiner Klasse mehr gebraucht wird. Ohne Angabe bleibt es wie bisher erhalten.
+  const body = (request.headers.get("Content-Type") || "").includes("json") ? await readJson(request).catch(() => ({})) : {};
+  const row = await env.DB.prepare("SELECT account_id FROM members WHERE id = ?").bind(member.id).first();
   await env.DB.batch(removeMemberStmts(env, member.id, Date.now()));
-  return json({ ok: true });
+  let accountDeleted = false;
+  if (body.deleteAccount === true && row && row.account_id) {
+    const results = await env.DB.batch(deleteUnusedAccountStmts(env, row.account_id));
+    accountDeleted = results[results.length - 1].meta.changes === 1;
+  }
+  return json({ ok: true, accountDeleted });
 }

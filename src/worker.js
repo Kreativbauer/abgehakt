@@ -6,7 +6,7 @@ import pkg from "../package.json";
 import { ApiError, errorResponse, json, rateLimit } from "./lib/http.js";
 import { checkCode, join } from "./api/join.js";
 import { exportMyData, me } from "./api/me.js";
-import { linkMember, startLogin, verifyLogin } from "./api/account.js";
+import { deleteAccount, linkMember, startLogin, verifyLogin } from "./api/account.js";
 import { createClass, createInvite, deleteClass, listInvites, renameClass, revokeInvite } from "./api/classes.js";
 import { operatorDeleteClass, operatorListReports, operatorRemoveMember, operatorResolveReport } from "./api/operator.js";
 import { listReports, reportTask, resolveReport } from "./api/reports.js";
@@ -53,6 +53,7 @@ const ROUTES = [
   ["POST", "/api/account/start", startLogin, "login-start"],
   ["POST", "/api/account/verify", verifyLogin, "login"],
   ["POST", "/api/account/link", linkMember],
+  ["POST", "/api/account/delete", deleteAccount],
   ["POST", "/api/classes", createClass],
   ["GET", "/api/invites", listInvites],
   ["POST", "/api/invites", createInvite],
