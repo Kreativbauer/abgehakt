@@ -3468,15 +3468,27 @@ function renderInstallHint() {
 
 let installCode = null; // einmal erzeugter Code für die Home-Bildschirm-App (pro Klasse, auch über Neuladen gemerkt)
 
-async function renderInstallCode() {
+/** Ist der gemerkte Code noch einlösbar? (Schon in der installierten App benutzt → nein.) Offline: im Zweifel ja. */
+async function installCodeStillValid(code) {
+  try {
+    await api("/api/code/check", { method: "POST", body: { code: code.code } });
+    return true;
+  } catch (err) {
+    return !(err.status >= 400 && err.status < 500 && err.status !== 429);
+  }
+}
+
+async function renderInstallCode({ fresh = false } = {}) {
   const box = $("install-code-box");
   box.replaceChildren();
   showError("error-install", "");
   const m = state.membership;
   try {
     if (!installCode || installCode.classId !== m.classId) installCode = readJsonStorage(INSTALL_CODE_PREFIX + m.classId, null);
-    // Ein neuer Code macht ältere ungültig – deshalb nur, wenn noch keiner da ist oder er bald abläuft.
-    if (!installCode || installCode.classId !== m.classId || installCode.expiresAt < Date.now() + 60 * 60 * 1000) {
+    // Ein neuer Code macht ältere ungültig – deshalb nur, wenn keiner da ist, er bald abläuft, schon eingelöst wurde
+    // oder ausdrücklich ein neuer gewünscht ist.
+    const usable = installCode && installCode.classId === m.classId && installCode.expiresAt > Date.now() + 60 * 60 * 1000;
+    if (fresh || !usable || !(await installCodeStillValid(installCode))) {
       const res = await api("/api/me/code", { method: "POST", token: m.token });
       installCode = { classId: m.classId, ...res.code };
       writeJsonStorage(INSTALL_CODE_PREFIX + m.classId, installCode);
@@ -3484,11 +3496,15 @@ async function renderInstallCode() {
     const pretty = `${installCode.code.slice(0, 4)}-${installCode.code.slice(4)}`;
     const copy = el("button", { class: "button button-small", type: "button", text: "Code kopieren" });
     copy.addEventListener("click", () => copyText(pretty, copy));
+    const renew = el("button", { class: "button button-small", type: "button", text: "Neuen Code erzeugen" });
+    renew.addEventListener("click", () => {
+      if (window.confirm("Neuen Code erzeugen? Der bisherige Code gilt dann nicht mehr.")) renderInstallCode({ fresh: true });
+    });
     box.append(el("div", { class: "invite card personal-code" },
       el("p", { class: "eyebrow", text: `Dein Code für die App · ${m.className}` }),
       el("p", { class: "invite-code", text: pretty }),
       el("p", { class: "hint", text: `Nur für dich, einmal nutzbar, gültig bis ${DATE_ONLY.format(new Date(installCode.expiresAt))}. Am besten jetzt kopieren oder merken.` }),
-      el("div", { class: "invite-actions" }, copy, ...(installsViaChrome() ? [chromeLink(installCode.code)] : [])),
+      el("div", { class: "invite-actions" }, copy, ...(installsViaChrome() ? [chromeLink(installCode.code)] : []), renew),
     ));
   } catch (err) {
     if (handleAuthError(err)) return;

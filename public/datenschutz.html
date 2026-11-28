@@ -76,6 +76,7 @@
       <li><strong>E-Mail-Adresse</strong> – für die Anmeldung per Code und für Hinweise zur eigenen Klasse (z. B. bevor eine inaktive Klasse gelöscht wird). Andere Mitglieder sehen die E-Mail-Adresse nicht.</li>
       <li>Anmeldecodes: Sie sind 10 Minuten gültig, werden nur als Prüfsumme gespeichert und nach einem Tag gelöscht.</li>
       <li>Zeitpunkt der letzten Anmeldung</li>
+      <li>zum Schutz vor Missbrauch: wenn ein Anmeldecode angefordert oder falsch eingegeben wird, <strong>24 Stunden lang eine Prüfsumme der IP-Adresse</strong> (zusammen mit der eingegebenen E-Mail-Adresse). So lässt sich begrenzen, wie oft von einem Gerät bzw. Netz Codes angefordert und geraten werden, ohne dass jemand Fremdes einen Admin aussperren kann. Danach wird beides gelöscht.</li>
       <li>ein <strong>Schlüssel der Admin-Anmeldung</strong> pro Gerät (auf dem Server nur als Prüfsumme) mit dem Zeitpunkt der Anmeldung und der letzten Nutzung. Er verfällt nach 90 Tagen ohne Nutzung.</li>
     </ul>
 
@@ -148,7 +149,7 @@
       <li><strong>Admin-Anmeldungen</strong> (Schlüssel pro Gerät) werden nach 90 Tagen ohne Nutzung gelöscht; danach meldet man sich einfach neu per E-Mail-Code an.</li>
       <li><strong>Fehlerprotokolle</strong> beim Hoster werden nach wenigen Tagen automatisch gelöscht.</li>
       <li><strong>Meldungen</strong> werden 6 Monate nach ihrer Bearbeitung gelöscht, spätestens mit der Klasse.</li>
-      <li><strong>Ideen und Fehlermeldungen</strong> werden 6 Monate nach ihrer Bearbeitung gelöscht, spätestens nach 12 Monaten. Die Prüfsumme zur Begrenzung wird nach 24 Stunden gelöscht.</li>
+      <li><strong>Ideen und Fehlermeldungen</strong> werden 6 Monate nach ihrer Bearbeitung gelöscht, spätestens nach 12 Monaten. Die Prüfsumme zur Begrenzung wird nach 24 Stunden gelöscht; Nachrichten von vor Version 0.36.4 werden dabei ebenfalls anonymisiert.</li>
       <li><strong>Sicherungskopien:</strong> Gelöschte Daten können noch bis zu 90 Tage in den verschlüsselten Sicherungskopien enthalten sein; danach werden die Kopien automatisch gelöscht. Sie werden nur zur Wiederherstellung nach einem technischen Fehler verwendet.</li>
     </ul>
 

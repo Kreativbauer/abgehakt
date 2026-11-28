@@ -83,9 +83,16 @@ export async function runDailyCleanup(env, now = Date.now()) {
     .bind(now - ACCOUNT_SESSION_MAX_IDLE_MS).run();
   summary.accountSessions = sessions.meta.changes;
 
-  // Begrenzung für Ideen/Fehler: nur 24 Stunden gebraucht.
+  // Begrenzungen (Ideen/Fehler, Admin-Anmeldung): nur 24 Stunden gebraucht.
   const limits = await env.DB.prepare("DELETE FROM feedback_limits WHERE created_at < ?").bind(now - DAY).run();
   summary.feedbackLimits = limits.meta.changes;
+  const loginLimits = await env.DB.prepare("DELETE FROM login_limits WHERE created_at < ?").bind(now - DAY).run();
+  summary.loginLimits = loginLimits.meta.changes;
+
+  // Ideen/Fehler von vor 0.36.4 trugen noch eine Prüfsumme der Person – leeren, damit alle Nachrichten anonym sind
+  // (mit OK von Nils; die Begrenzung liest die Spalte nicht mehr, es geht nichts verloren).
+  const anon = await env.DB.prepare("UPDATE feedback SET sender_hash = '' WHERE sender_hash != ''").run();
+  summary.feedbackAnonymized = anon.meta.changes;
 
   const orphan = `SELECT a.id FROM accounts a
                    WHERE a.last_login_at < ?

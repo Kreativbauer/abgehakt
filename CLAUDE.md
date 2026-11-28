@@ -113,8 +113,10 @@ wrangler.jsonc       Cloudflare-Konfiguration (Worker, Assets, D1, Rate-Limit)
 ## Admin-Anmeldung (Technik)
 
 - Nur Admins haben ein Konto (`accounts`, E-Mail klein geschrieben). Anmeldung per 6-stelligem
-  Code aus der E-Mail (`login_codes`: 10 Minuten gültig, 5 Versuche, max. 3 Codes pro 15 Minuten). Zusätzlich:
-  10 Fehlversuche pro Adresse in 24 Stunden → gesperrt; höchstens 60 Anmelde-E-Mails pro Tag insgesamt (Rest des
+  Code aus der E-Mail (`login_codes`: 10 Minuten gültig, 5 Versuche, max. 3 Codes pro 15 Minuten je Adresse und Netz). Zusätzlich
+  `login_limits` (Migration 0018, Prüfsumme der IP, 24 Stunden): höchstens 15 angeforderte Codes pro IP und Tag,
+  10 falsche Codes pro IP und Adresse bzw. 20 pro IP → nur dieses Netz ist gesperrt (nie die Adresse selbst, sonst
+  könnte jemand Fremdes einen Admin aussperren). Höchstens 60 Anmelde-E-Mails pro Tag insgesamt (Rest des
   Resend-Kontingents für Löschwarnungen); scheitert der Versand, wird der Code sofort entwertet.
 - Konto-Schlüssel (`account_sessions`) verfallen nach 90 Tagen ohne Nutzung (`ACCOUNT_SESSION_MAX_IDLE_MS` in
   `src/lib/auth.js`, der tägliche Lauf löscht sie).
@@ -148,7 +150,8 @@ wrangler.jsonc       Cloudflare-Konfiguration (Worker, Assets, D1, Rate-Limit)
   andere Person erzeugt** (`join_codes.created_by != member_id`) = Gerätewechsel: Beim Einlösen werden die bisherigen
   Geräte abgemeldet und ihre Benachrichtigungs-Abos gelöscht (`replaceDevicesStmts()` in `src/lib/purge.js`) – sonst
   könnte ein Admin unbemerkt private Aufgaben und Notizen mitlesen. Die Installations-Anleitung merkt sich ihren Code
-  (`abgehakt.installCode.<classId>`), damit nicht jedes Neuladen einen neuen erzeugt.
+  (`abgehakt.installCode.<classId>`), damit nicht jedes Neuladen einen neuen erzeugt – vor dem Anzeigen prüft sie ihn
+  (`/api/code/check`); ist er schon eingelöst, kommt ein neuer. Dazu der Knopf „Neuen Code erzeugen“.
 - Entfernen / Austreten (`removeMemberStmts()` in `src/lib/purge.js`): `members.removed_at`, Name →
   „Ehemaliges Mitglied“, Häkchen/Notizen/private Aufgaben gelöscht, Geräte und persönliche Codes ungültig.
 - Meine Daten (Auskunft/Datenübertragbarkeit, Art. 15/20): „Einstellungen → Für mich → Meine Daten“ →
@@ -213,7 +216,7 @@ wrangler.jsonc       Cloudflare-Konfiguration (Worker, Assets, D1, Rate-Limit)
   `classes.deletion_warned_at` setzen. Gelöscht wird erst bei 12 Monaten Inaktivität **und** frühestens
   30 Tage nach der Warnung. Aktivität nach der Warnung (`last_active_at > deletion_warned_at`) hebt sie auf.
 - Aufräumen: erledigte Meldungen und Feedback nach 6 Monaten (Feedback spätestens nach 12), Anmeldecodes nach 1 Tag,
-  `feedback_limits` nach 1 Tag, Admin-Anmeldungen nach 90 Tagen ohne Nutzung, Admin-Konten ohne Klasse
+  `feedback_limits` und `login_limits` nach 1 Tag, alte Feedback-Prüfsummen (vor 0.36.4) werden geleert, Admin-Anmeldungen nach 90 Tagen ohne Nutzung, Admin-Konten ohne Klasse
   nach 12 Monaten ohne Anmeldung.
 - Höchstens 40 Warnungen/Löschungen pro Lauf (Resend kostenlos: 100 E-Mails/Tag).
 - Lokal testen: `npm run dev`, dann
