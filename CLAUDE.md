@@ -163,6 +163,12 @@ wrangler.jsonc       Cloudflare-Konfiguration (Worker, Assets, D1, Rate-Limit)
   `GET /api/me/export` (`src/api/me.js`) liefert alles zur anfragenden Person (Name, Rolle, Häkchen, Notizen, private
   Aufgaben, eigene Klassen-Einträge, eigene Meldungen, Geräte, Benachrichtigungen, Admin-Konto) – nie Daten anderer;
   die App speichert es als JSON-Datei. Neue Daten zu einer Person → hier mit aufnehmen!
+- **Alle meine Daten löschen** (Einstellungen → Für mich, `deleteAllMyData()` in `app.js`): prüft vorher, ob die Person
+  irgendwo letzte Admin ist (dann Abbruch mit Hinweis), Bestätigung durch Eintippen von „LÖSCHEN“, dann `POST /api/me/leave
+  { deleteAccount: true }` für jede Klasse auf dem Gerät (löscht danach das Admin-Konto, wenn es nirgends mehr gebraucht
+  wird – `deleteUnusedAccountStmts()`), bei Admin-Anmeldung auf dem Gerät zusätzlich `POST /api/account/delete` (409, solange
+  das Konto noch in Klassen Admin ist), zuletzt alle `abgehakt.*`-Einträge in localStorage und sessionStorage löschen.
+  Nur Klassen auf diesem Gerät – andere Geräte löschen selbst.
 - Person entfernen durch den Betreiber (Wunsch der Eltern): `/betrieb` → `POST /api/operator/remove-member`
   { target: Klassen-Kennung, name } → `removeMemberStmts()` + `deleteUnusedAccountStmts()`. Gibt keine Inhalte zurück.
 - Status-Sichtbarkeit: `members.status_visibility` (`none` Standard, `all`, `some`) und

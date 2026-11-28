@@ -7,6 +7,12 @@
 
 const CHANGELOG = [
   {
+    version: "0.37.0",
+    items: [
+      "Neu in den Einstellungen: „Alle meine Daten löschen“. Du trittst damit aus allen Klassen auf diesem Gerät aus, ein Admin-Konto mit E-Mail wird mit gelöscht, und auf dem Gerät bleibt nichts von Abgehakt zurück.",
+    ],
+  },
+  {
     version: "0.36.0",
     items: [
       "Wiederholen geht jetzt auch „Jede Stunde (laut Stundenplan)“ – z. B. eine mögliche Abfrage in jeder Mathe-Stunde, auch wenn Mathe mehrmals pro Woche ist.",

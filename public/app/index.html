@@ -15,9 +15,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <link rel="stylesheet" href="/css/style.css?v=0.36.4">
-  <script src="/js/changelog.js?v=0.36.4" defer></script>
-  <script src="/js/app.js?v=0.36.4" defer></script>
+  <link rel="stylesheet" href="/css/style.css?v=0.37.0">
+  <script src="/js/changelog.js?v=0.37.0" defer></script>
+  <script src="/js/app.js?v=0.37.0" defer></script>
 </head>
 <body class="app">
   <p id="test-banner" class="test-banner" hidden>Testversion – eigene Test-Daten, nicht dein echtes Heft</p>
@@ -516,6 +516,14 @@
         <button id="button-leave" class="button button-danger" type="button">Klasse verlassen</button>
       </div>
 
+      <div class="card danger-zone">
+        <h2 class="section-title">Alle meine Daten löschen</h2>
+        <p class="hint">Du trittst aus allen Klassen auf diesem Gerät aus. Dabei werden deine Häkchen, Notizen und privaten Aufgaben gelöscht, dein Name wird jeweils zu „Ehemaliges Mitglied“. Bist du Admin, wird auch dein Konto mit E-Mail-Adresse gelöscht. Zum Schluss wird alles gelöscht, was Abgehakt auf diesem Gerät gespeichert hat.</p>
+        <p class="hint">Bist du auf einem anderen Gerät noch in weiteren Klassen, lösche dort auch.</p>
+        <p id="error-delete-all" class="error" role="alert" hidden></p>
+        <button id="button-delete-all" class="button button-danger" type="button">Alle meine Daten löschen</button>
+      </div>
+
 
 
       <p><button id="button-settings-back" class="button" type="button">Zurück zum Heft</button></p>
@@ -716,7 +724,7 @@
 
   <footer class="footer">
     <nav class="legal-nav" aria-label="Rechtliches"><a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a></nav>
-    <span class="status">Version 0.36.4</span>
+    <span class="status">Version 0.37.0</span>
   </footer>
 </body>
 </html>

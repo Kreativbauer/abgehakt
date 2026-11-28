@@ -2,10 +2,12 @@
 //   POST /api/account/start   { email }          → schickt einen 6-stelligen Code
 //   POST /api/account/verify  { email, code }    → meldet an, liefert Konto-Schlüssel + Admin-Klassen
 //   POST /api/account/link    { memberToken }    → verknüpft eine Admin-Person auf diesem Gerät mit dem Konto
+//   POST /api/account/delete                     → Admin-Konto löschen („Alle meine Daten löschen“), nur ohne Admin-Klassen
 import { ApiError, clientNet, json, readJson } from "../lib/http.js";
 import { newDeviceToken, newId, newLoginCode, sha256Hex } from "../lib/crypto.js";
 import { requireAccount } from "../lib/auth.js";
 import { newDeviceFor } from "../lib/devices.js";
+import { deleteUnusedAccountStmts } from "../lib/purge.js";
 import { sendLoginCode } from "../lib/email.js";
 
 const CODE_TTL_MS = 10 * 60 * 1000;
@@ -204,4 +206,20 @@ export async function linkMember(request, env) {
     "UPDATE members SET account_id = ? WHERE id = ? AND account_id IS NULL"
   ).bind(account.id, row.id).run();
   return json({ linked: true });
+}
+
+/**
+ * Admin-Konto löschen (E-Mail-Adresse, Anmeldungen, Anmeldecodes) – nur, wenn es in keiner Klasse mehr Admin ist.
+ * Sonst 409 mit der Anzahl der Klassen (die App verlässt vorher alle Klassen auf diesem Gerät).
+ */
+export async function deleteAccount(request, env) {
+  const { account } = await requireAccount(request, env);
+  const used = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM members WHERE account_id = ? AND removed_at IS NULL"
+  ).bind(account.id).first();
+  if (used.n > 0) {
+    throw new ApiError(409, `Deine E-Mail-Adresse ist noch in ${used.n === 1 ? "einer Klasse" : `${used.n} Klassen`} mit Admin-Rechten verknüpft. Melde dich mit deiner E-Mail neu an („Du bist schon Admin?“) – dann holt Abgehakt diese Klassen aufs Gerät – und lösche noch einmal.`, "account_in_use");
+  }
+  await env.DB.batch(deleteUnusedAccountStmts(env, account.id));
+  return json({ ok: true });
 }

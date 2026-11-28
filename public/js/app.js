@@ -2793,6 +2793,77 @@ async function leaveClass() {
   }
 }
 
+/**
+ * „Alle meine Daten löschen“: aus allen Klassen auf diesem Gerät austreten (dabei das Admin-Konto löschen, wenn es
+ * nirgends mehr gebraucht wird), dann alles von Abgehakt auf dem Gerät löschen. Letzte Admins werden vorher gestoppt.
+ */
+async function deleteAllMyData() {
+  const list = loadMemberships();
+  const account = loadAccount();
+  showError("error-delete-all", "");
+  if (!navigator.onLine) return showError("error-delete-all", "Zum Löschen brauchst du Internet.");
+  const button = $("button-delete-all");
+  button.disabled = true;
+  try {
+    // Vorher prüfen, damit nicht nur ein Teil gelöscht wird: In keiner Klasse die letzte Person mit Admin-Rechten?
+    const blocked = [];
+    for (const m of list.filter((x) => x.role === "admin")) {
+      try {
+        const res = await api("/api/members", { token: m.token });
+        if (res.members.filter((x) => x.role === "admin").length <= 1) blocked.push(m.className);
+      } catch (err) {
+        if (err.status !== 401) throw err; // 401: dort schon nicht mehr dabei
+      }
+    }
+    if (blocked.length) {
+      return showError("error-delete-all", `Du bist in ${blocked.map((n) => `„${n}“`).join(", ")} die einzige Person mit Admin-Rechten. Ernenne dort erst eine andere Person zum Admin oder lösche die Klasse (Einstellungen → Klasse).`);
+    }
+    const classes = list.map((m) => `• ${m.className}`).join("\n");
+    const typed = window.prompt(`Wirklich alle deine Daten löschen?\n\n${list.length ? `Du trittst aus diesen Klassen aus:\n${classes}\n\n` : ""}${account ? `Dein Admin-Konto (${account.email}) wird gelöscht.\n\n` : ""}Das lässt sich nicht rückgängig machen. Zur Bestätigung LÖSCHEN eintippen:`);
+    if (typed === null) return;
+    if (typed.trim().toUpperCase() !== "LÖSCHEN") return showError("error-delete-all", "Nichts gelöscht – bitte genau LÖSCHEN eintippen.");
+
+    const left = [];
+    for (const m of list) {
+      try {
+        await api("/api/me/leave", { method: "POST", body: { deleteAccount: true }, token: m.token });
+      } catch (err) {
+        if (err.status !== 401) {
+          saveMemberships(list.filter((x) => !left.includes(x.classId)));
+          return showError("error-delete-all", `Bei „${m.className}“ hat es nicht geklappt (${err.message}). ${left.length ? "Aus den anderen Klassen bist du schon ausgetreten. " : ""}Bitte noch einmal versuchen.`);
+        }
+      }
+      left.push(m.classId);
+    }
+    if (account) {
+      try {
+        await api("/api/account/delete", { method: "POST", token: account.token });
+      } catch (err) {
+        if (err.status !== 401) {
+          // Klassen sind schon verlassen – die Mitgliedschaften auf dem Gerät entfernen, das Konto bleibt angemeldet.
+          saveMemberships([]);
+          return showError("error-delete-all", err.message);
+        }
+      }
+    }
+    // Alles von Abgehakt auf diesem Gerät löschen (Klassen, Zwischenspeicher, Warteschlangen, Einstellungen, Anmeldung).
+    try {
+      for (const key of Object.keys(localStorage)) if (key.startsWith("abgehakt.")) localStorage.removeItem(key);
+      sessionStorage.clear();
+    } catch { /* egal */ }
+    state.membership = null;
+    state.tasks = [];
+    renderSwitcher([], null); // Klassen-Auswahl oben leeren
+    applyTheme();             // Farb-Design zurück auf Standard
+    startJoin();
+    showNotice("Alle deine Daten bei Abgehakt sind gelöscht – auf dem Server und auf diesem Gerät.");
+  } catch (err) {
+    showError("error-delete-all", err.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 // ---------- Melden ----------
 
 let reportingTask = null;
@@ -3651,6 +3722,7 @@ function init() {
   $("form-visibility").addEventListener("submit", onVisibilitySubmit);
   $("form-visibility").addEventListener("change", (e) => { if (e.target.name === "visibility") updateViewerVisibility(); });
   $("button-leave").addEventListener("click", leaveClass);
+  $("button-delete-all").addEventListener("click", deleteAllMyData);
   $("button-own-code").addEventListener("click", createOwnCode);
   $("button-choose-electives").addEventListener("click", () => openElectives());
   $("button-toggle-all-subjects").addEventListener("click", toggleAllSubjects);

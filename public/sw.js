@@ -1,6 +1,6 @@
 // Abgehakt – Service Worker: macht die App offline nutzbar.
 // VERSION muss zu package.json passen (prüft `npm run check`). Neue Version = neuer Cache.
-const VERSION = "0.36.4";
+const VERSION = "0.37.0";
 const CACHE = `abgehakt-${VERSION}`;
 
 // App-Hülle: wird beim Installieren vorab gespeichert.
