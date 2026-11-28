@@ -13,19 +13,16 @@ const MAX_ATTEMPTS = 5;
 const MAX_CODES_PER_WINDOW = 3;           // pro E-Mail-Adresse und Netz …
 const CODE_WINDOW_MS = 15 * 60 * 1000;    // … in 15 Minuten
 const DAY_MS = 24 * 60 * 60 * 1000;
-// Schutz vor dem Übernehmen eines Kontos (Raten) – NIE nur pro Netz zählen, Netze lassen sich wechseln:
+// Grenzen pro Code und pro E-Mail-Adresse, nie nur pro Netz – Netze lassen sich wechseln:
 //   - jeder Code höchstens MAX_ATTEMPTS Prüfungen insgesamt (atomar reserviert, siehe verifyLogin)
 //   - höchstens MAX_CODES_PER_EMAIL_DAY Codes pro Adresse und Tag → höchstens 6 × 5 = 30 Rateversuche pro Tag
-// Zusätzlich pro Netz (Prüfsumme in login_limits, 24 Stunden), damit ein einzelnes Netz nur sich selbst sperrt.
-// Bewusster Tausch: Wer eine Admin-Adresse kennt, kann diesen Admin für einen Tag aussperren (etwa 36 Anfragen).
-// Übernehmen kann er das Konto nicht.
+// Zusätzlich pro Netz (Prüfsumme in login_limits, 24 Stunden).
 const MAX_CODES_PER_EMAIL_DAY = 6;        // Codes pro Adresse in 24 Stunden, über alle Netze
 const MAX_MAILS_PER_IP_DAY = 15;          // angeforderte Codes pro Netz in 24 Stunden
 const MAX_FAILS_PER_IP_EMAIL = 10;        // falsche Codes pro Netz und Adresse in 24 Stunden
 const MAX_FAILS_PER_IP = 20;              // falsche Codes pro Netz insgesamt in 24 Stunden
-// Anmelde-E-Mails insgesamt pro Tag (Resend kostenlos: 100/Tag, Rest für Löschwarnungen) – getrennt, damit ausgedachte
-// Adressen die bestehenden Admins nicht aussperren. Gleiche Meldung für beide (Restrisiko: man könnte erkennen,
-// ob eine Adresse ein Konto hat, wenn nur ein Kontingent voll ist – bewusst in Kauf genommen).
+// Anmelde-E-Mails insgesamt pro Tag (Resend kostenlos: 100/Tag, Rest für Löschwarnungen) – getrennte Kontingente für
+// Adressen mit und ohne Konto, mit derselben Meldung.
 const MAX_MAILS_KNOWN_DAY = 40;           // Adressen mit Admin-Konto
 const MAX_MAILS_NEW_DAY = 20;             // neue Adressen (Klasse anlegen)
 

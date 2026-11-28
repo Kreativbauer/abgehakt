@@ -114,7 +114,7 @@ wrangler.jsonc       Cloudflare-Konfiguration (Worker, Assets, D1, Rate-Limit)
 
 - Nur Admins haben ein Konto (`accounts`, E-Mail klein geschrieben). Anmeldung per 6-stelligem
   Code aus der E-Mail (`login_codes`, 10 Minuten gültig). Grenzen (`src/api/account.js`):
-  - **Gegen Übernahme (nie nur pro Netz zählen – Netze lassen sich wechseln!):** jeder Code höchstens 5 Prüfungen
+  - **Grenzen pro Code und pro E-Mail-Adresse, nie nur pro Netz – Netze lassen sich wechseln:** jeder Code höchstens 5 Prüfungen
     insgesamt, atomar reserviert (`UPDATE … attempts + 1 … RETURNING`, dann vergleichen; jeder gültige Code zählt, nicht
     nur der neueste); höchstens 6 Codes pro Adresse und Tag über alle Netze (Einfügen nur mit Platz, in einem Schritt)
     → höchstens 30 Rateversuche pro Adresse und Tag.
@@ -123,8 +123,6 @@ wrangler.jsonc       Cloudflare-Konfiguration (Worker, Assets, D1, Rate-Limit)
   - Ohne gültigen Code („abgelaufen“) oder mit verbrauchten Codes („neuen Code anfordern“) zählt ein Versuch nicht.
   - Tageskontingent Anmelde-E-Mails: 40 für Adressen mit Konto, 20 für neue (Rest des Resend-Kontingents für
     Löschwarnungen), gleiche Meldung für beide. Scheitert der Versand, wird der Code sofort entwertet (zählt aber mit).
-  - **Bewusster Tausch:** Wer eine Admin-Adresse kennt, kann diesen Admin für einen Tag aussperren (etwa 36 Anfragen).
-    Übernehmen kann er das Konto nicht.
 - Konto-Schlüssel (`account_sessions`) verfallen nach 90 Tagen ohne Nutzung (`ACCOUNT_SESSION_MAX_IDLE_MS` in
   `src/lib/auth.js`, der tägliche Lauf löscht sie).
 - Nach der Anmeldung: Konto-Schlüssel (`account_sessions`) für „Klasse anlegen“. In der Klasse
