@@ -2,7 +2,7 @@
 //   POST /api/account/start   { email }          → schickt einen 6-stelligen Code
 //   POST /api/account/verify  { email, code }    → meldet an, liefert Konto-Schlüssel + Admin-Klassen
 //   POST /api/account/link    { memberToken }    → verknüpft eine Admin-Person auf diesem Gerät mit dem Konto
-import { ApiError, json, readJson } from "../lib/http.js";
+import { ApiError, clientNet, json, readJson } from "../lib/http.js";
 import { newDeviceToken, newId, newLoginCode, sha256Hex } from "../lib/crypto.js";
 import { requireAccount } from "../lib/auth.js";
 import { newDeviceFor } from "../lib/devices.js";
@@ -13,16 +13,25 @@ const MAX_ATTEMPTS = 5;
 const MAX_CODES_PER_WINDOW = 3;           // pro E-Mail-Adresse und Netz …
 const CODE_WINDOW_MS = 15 * 60 * 1000;    // … in 15 Minuten
 const DAY_MS = 24 * 60 * 60 * 1000;
-// Begrenzungen pro Netz (IP, nur als Prüfsumme in login_limits, 24 Stunden) – nie pro E-Mail-Adresse allein, sonst
-// könnte jemand Fremdes einen Admin aussperren (der echte Admin kommt aus einem anderen Netz).
-const MAX_MAILS_PER_IP_DAY = 15;          // angeforderte Codes pro IP in 24 Stunden
-const MAX_FAILS_PER_IP_EMAIL = 10;        // falsche Codes pro IP und Adresse in 24 Stunden
-const MAX_FAILS_PER_IP = 20;              // falsche Codes pro IP insgesamt in 24 Stunden
-const MAX_MAILS_PER_DAY = 60;             // Anmelde-E-Mails insgesamt (Resend kostenlos: 100/Tag, Rest für Löschwarnungen)
+// Schutz vor dem Übernehmen eines Kontos (Raten) – NIE nur pro Netz zählen, Netze lassen sich wechseln:
+//   - jeder Code höchstens MAX_ATTEMPTS Prüfungen insgesamt (atomar reserviert, siehe verifyLogin)
+//   - höchstens MAX_CODES_PER_EMAIL_DAY Codes pro Adresse und Tag → höchstens 6 × 5 = 30 Rateversuche pro Tag
+// Zusätzlich pro Netz (Prüfsumme in login_limits, 24 Stunden), damit ein einzelnes Netz nur sich selbst sperrt.
+// Bewusster Tausch: Wer eine Admin-Adresse kennt, kann diesen Admin für einen Tag aussperren (etwa 36 Anfragen).
+// Übernehmen kann er das Konto nicht.
+const MAX_CODES_PER_EMAIL_DAY = 6;        // Codes pro Adresse in 24 Stunden, über alle Netze
+const MAX_MAILS_PER_IP_DAY = 15;          // angeforderte Codes pro Netz in 24 Stunden
+const MAX_FAILS_PER_IP_EMAIL = 10;        // falsche Codes pro Netz und Adresse in 24 Stunden
+const MAX_FAILS_PER_IP = 20;              // falsche Codes pro Netz insgesamt in 24 Stunden
+// Anmelde-E-Mails insgesamt pro Tag (Resend kostenlos: 100/Tag, Rest für Löschwarnungen) – getrennt, damit ausgedachte
+// Adressen die bestehenden Admins nicht aussperren. Gleiche Meldung für beide (Restrisiko: man könnte erkennen,
+// ob eine Adresse ein Konto hat, wenn nur ein Kontingent voll ist – bewusst in Kauf genommen).
+const MAX_MAILS_KNOWN_DAY = 40;           // Adressen mit Admin-Konto
+const MAX_MAILS_NEW_DAY = 20;             // neue Adressen (Klasse anlegen)
 
-/** Prüfsumme der IP-Adresse (die Adresse selbst wird nicht gespeichert). */
+/** Prüfsumme des Netzes (die IP-Adresse selbst wird nicht gespeichert; IPv6 gekürzt auf /64, siehe clientNet). */
 async function ipHashOf(request) {
-  return sha256Hex(`login-ip:${request.headers.get("CF-Connecting-IP") || "unbekannt"}`);
+  return sha256Hex(`login-ip:${clientNet(request)}`);
 }
 
 async function countLimits(env, where, binds) {
@@ -54,19 +63,32 @@ export async function startLogin(request, env) {
   if (await countLimits(env, "ip_hash = ? AND kind = 'mail' AND created_at > ?", [ipHash, now - DAY_MS]) >= MAX_MAILS_PER_IP_DAY) {
     throw new ApiError(429, "Von diesem Gerät bzw. Netz wurden heute schon viele Codes angefordert. Bitte morgen erneut versuchen.", "rate_limited");
   }
-  const total = await env.DB.prepare("SELECT COUNT(*) AS n FROM login_codes WHERE created_at > ?").bind(now - DAY_MS).first();
-  if (total.n >= MAX_MAILS_PER_DAY) {
-    throw new ApiError(429, "Heute wurden schon sehr viele Anmelde-Codes verschickt. Bitte morgen erneut versuchen.", "rate_limited");
-  }
+  const known = Boolean(await env.DB.prepare("SELECT 1 FROM accounts WHERE email = ?").bind(email).first());
+  const since = now - DAY_MS;
 
+  // Nur einfügen, wenn pro Adresse und im passenden Tageskontingent noch Platz ist – in EINEM Schritt, damit auch
+  // gleichzeitige Anfragen die Grenzen nicht überschreiten. Gescheiterte Versände zählen mit (bleiben als benutzt stehen).
   const code = newLoginCode();
   const id = newId();
-  await env.DB.batch([
+  const [inserted] = await env.DB.batch([
     env.DB.prepare(
-      "INSERT INTO login_codes (id, email, code_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)"
-    ).bind(id, email, await codeHash(email, code), now, now + CODE_TTL_MS),
-    env.DB.prepare("INSERT INTO login_limits (ip_hash, kind, email, created_at) VALUES (?, 'mail', ?, ?)").bind(ipHash, email, now),
+      `INSERT INTO login_codes (id, email, code_hash, created_at, expires_at)
+       SELECT ?1, ?2, ?3, ?4, ?5
+        WHERE (SELECT COUNT(*) FROM login_codes WHERE email = ?2 AND created_at > ?6) < ?7
+          AND (SELECT COUNT(*) FROM login_codes
+                WHERE created_at > ?6 AND ${known ? "" : "NOT "}email IN (SELECT email FROM accounts)) < ?8`
+    ).bind(id, email, await codeHash(email, code), now, now + CODE_TTL_MS, since, MAX_CODES_PER_EMAIL_DAY,
+      known ? MAX_MAILS_KNOWN_DAY : MAX_MAILS_NEW_DAY),
+    env.DB.prepare(
+      "INSERT INTO login_limits (ip_hash, kind, email, created_at) SELECT ?, 'mail', ?, ? WHERE changes() = 1"
+    ).bind(ipHash, email, now),
   ]);
+  if (inserted.meta.changes !== 1) {
+    const perEmail = await env.DB.prepare("SELECT COUNT(*) AS n FROM login_codes WHERE email = ? AND created_at > ?").bind(email, since).first();
+    throw new ApiError(429, perEmail.n >= MAX_CODES_PER_EMAIL_DAY
+      ? "Für diese Adresse wurden heute schon mehrere Codes verschickt. Bitte einen davon benutzen oder morgen erneut versuchen."
+      : "Heute wurden schon sehr viele Anmelde-Codes verschickt. Bitte morgen erneut versuchen.", "rate_limited");
+  }
 
   // Nur Testversion (abgehakt-test, Variable TEST_SHOW_CODES in wrangler.jsonc → env.test): keine E-Mail, der Code
   // geht direkt an die App. Doppelt abgesichert über den Hostnamen – auf der echten Adresse passiert das nie.
@@ -89,7 +111,7 @@ export async function verifyLogin(request, env) {
   const code = typeof body.code === "string" ? body.code.replace(/\D/g, "") : "";
   if (code.length !== 6) throw new ApiError(400, "Der Code hat 6 Ziffern.", "invalid_code");
   const now = Date.now();
-  // Gesperrt wird nur das Netz, aus dem falsch geraten wurde – der echte Admin kann sich weiter anmelden.
+  // Pro Netz: Ein Netz, das zu oft falsch geraten hat, ist gesperrt – andere Netze (der echte Admin) nicht.
   const ipHash = await ipHashOf(request);
   const since = now - DAY_MS;
   if (await countLimits(env, "ip_hash = ? AND kind = 'fail' AND email = ? AND created_at > ?", [ipHash, email, since]) >= MAX_FAILS_PER_IP_EMAIL
@@ -97,28 +119,30 @@ export async function verifyLogin(request, env) {
     throw LOCKED();
   }
 
-  // Alle noch gültigen Codes dieser Adresse zählen – nicht nur der neueste. Sonst könnte jemand Fremdes kurz nach dem
-  // Admin einen weiteren Code anfordern, und der richtige Code des Admins würde abgelehnt.
+  // Erst einen Versuch bei ALLEN noch gültigen Codes dieser Adresse reservieren, dann vergleichen – in einem Schritt.
+  // So bekommt kein Code mehr als MAX_ATTEMPTS Prüfungen, egal aus wie vielen Netzen und wie gleichzeitig geraten wird.
+  // Jeder gültige Code zählt (nicht nur der neueste) – sonst würde der Code des Admins ungültig, sobald Fremde einen
+  // weiteren anfordern.
   const { results: rows } = await env.DB.prepare(
-    `SELECT id, code_hash, created_at FROM login_codes
-      WHERE email = ? AND used_at IS NULL AND expires_at > ?
-      ORDER BY created_at DESC LIMIT 10`
-  ).bind(email, now).all();
-  if (!rows.length) throw new ApiError(400, "Der Code ist abgelaufen. Bitte einen neuen anfordern.", "code_expired");
-  // Höchstens 5 Fehlversuche seit dem neuesten Code – gezählt pro Netz, damit Fremde nicht die Versuche des Admins
-  // verbrauchen (login_codes.attempts zählt nur noch mit).
-  const tries = await countLimits(env, "ip_hash = ? AND kind = 'fail' AND email = ? AND created_at >= ?", [ipHash, email, rows[0].created_at]);
-  if (tries >= MAX_ATTEMPTS) {
-    throw new ApiError(429, "Zu viele falsche Versuche. Bitte einen neuen Code anfordern.", "code_expired");
+    `UPDATE login_codes SET attempts = attempts + 1
+      WHERE email = ? AND used_at IS NULL AND expires_at > ? AND attempts < ?
+     RETURNING id, code_hash, attempts`
+  ).bind(email, now, MAX_ATTEMPTS).all();
+  if (!rows.length) {
+    // Nichts reserviert: entweder kein gültiger Code oder alle verbraucht. Zählt nicht als Fehlversuch.
+    const open = await env.DB.prepare(
+      "SELECT 1 FROM login_codes WHERE email = ? AND used_at IS NULL AND expires_at > ? LIMIT 1"
+    ).bind(email, now).first();
+    throw open
+      ? new ApiError(429, "Zu viele falsche Versuche. Bitte einen neuen Code anfordern.", "code_expired")
+      : new ApiError(400, "Der Code ist abgelaufen. Bitte einen neuen anfordern.", "code_expired");
   }
   const hash = await codeHash(email, code);
   const row = rows.find((r) => r.code_hash === hash);
   if (!row) {
-    await env.DB.batch([
-      ...rows.map((r) => env.DB.prepare("UPDATE login_codes SET attempts = attempts + 1 WHERE id = ?").bind(r.id)),
-      env.DB.prepare("INSERT INTO login_limits (ip_hash, kind, email, created_at) VALUES (?, 'fail', ?, ?)").bind(ipHash, email, now),
-    ]);
-    const left = MAX_ATTEMPTS - tries - 1;
+    await env.DB.prepare("INSERT INTO login_limits (ip_hash, kind, email, created_at) VALUES (?, 'fail', ?, ?)")
+      .bind(ipHash, email, now).run();
+    const left = MAX_ATTEMPTS - Math.min(...rows.map((r) => r.attempts));
     throw new ApiError(400, left > 0
       ? `Der Code stimmt nicht. Noch ${left} ${left === 1 ? "Versuch" : "Versuche"}.`
       : "Der Code stimmt nicht. Bitte einen neuen anfordern.", "wrong_code");

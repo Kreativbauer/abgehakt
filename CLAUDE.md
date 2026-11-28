@@ -104,7 +104,7 @@ wrangler.jsonc       Cloudflare-Konfiguration (Worker, Assets, D1, Rate-Limit)
 - Ein Gerät kann in mehreren Klassen sein: ein Schlüssel pro Klasse.
 - Codes: 8 Zeichen ohne 0/O/1/I/L, angezeigt als `XXXX-XXXX`. Einladungslink: `/app/#code=XXXXXXXX`
   (im `#`-Teil, damit der Code nicht in Server-Logs landet).
-- Code-Endpunkte sind pro IP begrenzt (`CODE_LIMITER`, 60/Minute – Schulklassen teilen sich eine IP), mit **getrennten
+- Code-Endpunkte sind pro Netz begrenzt (`clientNet()` in `src/lib/http.js`: IPv4 bzw. IPv6-/64; `CODE_LIMITER`, 60/Minute – Schulklassen teilen sich eine IP), mit **getrennten
   Zählern je Bereich** (`limit` in `ROUTES`: `code-check`, `join`, `login-start`, `login`, `operator`). Anmelde-E-Mails
   zusätzlich `LOGIN_LIMITER` (5/Minute/IP), ebenso das Passwort der Testversion.
 - Beitreten mit Einladungscode: höchstens `MAX_MEMBERS` (200) Personen pro Klasse (`src/api/join.js`).
@@ -113,11 +113,18 @@ wrangler.jsonc       Cloudflare-Konfiguration (Worker, Assets, D1, Rate-Limit)
 ## Admin-Anmeldung (Technik)
 
 - Nur Admins haben ein Konto (`accounts`, E-Mail klein geschrieben). Anmeldung per 6-stelligem
-  Code aus der E-Mail (`login_codes`: 10 Minuten gültig, 5 Versuche, max. 3 Codes pro 15 Minuten je Adresse und Netz). Zusätzlich
-  `login_limits` (Migration 0018, Prüfsumme der IP, 24 Stunden): höchstens 15 angeforderte Codes pro IP und Tag,
-  10 falsche Codes pro IP und Adresse bzw. 20 pro IP → nur dieses Netz ist gesperrt (nie die Adresse selbst, sonst
-  könnte jemand Fremdes einen Admin aussperren). Höchstens 60 Anmelde-E-Mails pro Tag insgesamt (Rest des
-  Resend-Kontingents für Löschwarnungen); scheitert der Versand, wird der Code sofort entwertet.
+  Code aus der E-Mail (`login_codes`, 10 Minuten gültig). Grenzen (`src/api/account.js`):
+  - **Gegen Übernahme (nie nur pro Netz zählen – Netze lassen sich wechseln!):** jeder Code höchstens 5 Prüfungen
+    insgesamt, atomar reserviert (`UPDATE … attempts + 1 … RETURNING`, dann vergleichen; jeder gültige Code zählt, nicht
+    nur der neueste); höchstens 6 Codes pro Adresse und Tag über alle Netze (Einfügen nur mit Platz, in einem Schritt)
+    → höchstens 30 Rateversuche pro Adresse und Tag.
+  - **Pro Netz** (`login_limits`, Migration 0018, Prüfsumme von `clientNet()` = IPv4 bzw. IPv6-/64, 24 Stunden):
+    3 Codes pro 15 Minuten je Adresse, 15 Codes pro Tag, 10 falsche Codes je Adresse bzw. 20 insgesamt → nur dieses Netz ist gesperrt.
+  - Ohne gültigen Code („abgelaufen“) oder mit verbrauchten Codes („neuen Code anfordern“) zählt ein Versuch nicht.
+  - Tageskontingent Anmelde-E-Mails: 40 für Adressen mit Konto, 20 für neue (Rest des Resend-Kontingents für
+    Löschwarnungen), gleiche Meldung für beide. Scheitert der Versand, wird der Code sofort entwertet (zählt aber mit).
+  - **Bewusster Tausch:** Wer eine Admin-Adresse kennt, kann diesen Admin für einen Tag aussperren (etwa 36 Anfragen).
+    Übernehmen kann er das Konto nicht.
 - Konto-Schlüssel (`account_sessions`) verfallen nach 90 Tagen ohne Nutzung (`ACCOUNT_SESSION_MAX_IDLE_MS` in
   `src/lib/auth.js`, der tägliche Lauf löscht sie).
 - Nach der Anmeldung: Konto-Schlüssel (`account_sessions`) für „Klasse anlegen“. In der Klasse

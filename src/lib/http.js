@@ -48,11 +48,29 @@ export async function readJson(request) {
   }
 }
 
-/** Begrenzt Anfragen pro IP (Schutz vor dem Durchprobieren von Codes). */
+/**
+ * Netz der anfragenden Person für Begrenzungen: IPv4 = die Adresse, IPv6 = nur der /64-Bereich (ein Anschluss hat
+ * meist ein ganzes /64 – sonst zählte jede der 2⁶⁴ Adressen einzeln). IPv4 in IPv6-Schreibweise (::ffff:1.2.3.4)
+ * zählt als IPv4. Achtung: Angreifer bekommen leicht ein /56 oder /48 (256 bis 65.536 Netze) – /64 erschwert das nur.
+ * Den eigentlichen Schutz liefern Grenzen pro Code und pro E-Mail-Adresse (src/api/account.js).
+ */
+export function clientNet(request) {
+  const raw = (request.headers.get("CF-Connecting-IP") || "unbekannt").trim().toLowerCase().replace(/%.*$/, "");
+  if (!raw.includes(":")) return raw;
+  const mapped = raw.match(/^(?:::|(?:0{1,4}:){5})ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (mapped) return mapped[1];
+  const [head, tail] = raw.split("::");
+  const h = head ? head.split(":") : [];
+  const t = tail ? tail.split(":") : [];
+  const groups = raw.includes("::") ? [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill("0"), ...t] : h;
+  if (groups.length !== 8 || !groups.every((g) => /^[0-9a-f]{1,4}$/.test(g))) return raw;
+  return `${groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":")}::/64`;
+}
+
+/** Begrenzt Anfragen pro Netz (Schutz vor dem Durchprobieren von Codes). */
 export async function rateLimit(limiter, request, scope) {
   if (!limiter) return; // z. B. in Tests ohne Binding
-  const ip = request.headers.get("CF-Connecting-IP") || "unbekannt";
-  const { success } = await limiter.limit({ key: `${scope}:${ip}` });
+  const { success } = await limiter.limit({ key: `${scope}:${clientNet(request)}` });
   if (!success) {
     throw new ApiError(429, "Zu viele Versuche. Bitte eine Minute warten.", "rate_limited");
   }
